@@ -3,7 +3,7 @@ import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { setSession } from "@/lib/auth";
 
-const GEOFENCE = { lat: 40.8610, lng: -73.8837, radiusFt: 1000 };
+const GEOFENCE = { lat: 38.0336, lng: -78.5080, radiusFt: 1000 };
 
 const YARD_CHECKLIST = {
   in:  [

@@ -2,53 +2,61 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { getSession, getEmployees } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 
-const LS_KEY = "ue_schedule";
 const MAX_WORKERS = 3;
 
-function loadSchedule() {
-  try { return JSON.parse(localStorage.getItem(LS_KEY) || "{}"); }
-  catch { return {}; }
-}
-
-function saveSchedule(data) {
-  localStorage.setItem(LS_KEY, JSON.stringify(data));
-}
-
 function formatDate(dateStr) {
-  const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+  return new Date(dateStr + "T00:00:00").toLocaleDateString([], {
+    weekday: "long", month: "long", day: "numeric", year: "numeric",
+  });
 }
 
 export default function SchedulePage() {
   const { date } = useParams();
   const router   = useRouter();
-  const [session, setSession] = useState(null);
-  const [workers, setWorkers] = useState([]);
-  const allEmployees = getEmployees();
+  const [session, setSession]     = useState(null);
+  const [workers, setWorkers]     = useState([]); // [{ id, name, slotId }]
+  const [allEmployees, setAllEmployees] = useState([]);
+  const [loading, setLoading]     = useState(true);
 
   useEffect(() => {
     const s = getSession();
     if (!s) { router.replace("/login"); return; }
     setSession(s);
-    setWorkers(loadSchedule()[date] || []);
+
+    Promise.all([
+      fetch(`/api/schedule`).then(r => r.json()),
+      fetch(`/api/employees`).then(r => r.json()),
+    ]).then(([schedule, employees]) => {
+      setWorkers(schedule[date] || []);
+      setAllEmployees(employees);
+      setLoading(false);
+    }).catch(() => setLoading(false));
   }, [date, router]);
 
-  if (!session) return null;
+  if (!session || loading) return null;
 
-  const isAdmin    = session.role === "admin";
+  const isAdmin = session.role === "admin";
 
-  function adminToggle(emp) {
-    const sched     = loadSchedule();
-    const onShift   = workers.some((w) => w.id === emp.id);
-    const updated   = onShift
-      ? workers.filter((w) => w.id !== emp.id)
-      : [...workers, { id: emp.id, name: emp.name }];
-    sched[date] = updated;
-    saveSchedule(sched);
-    setWorkers(updated);
+  async function adminAdd(emp) {
+    const res  = await fetch("/api/schedule", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ date, employeeId: emp.id, addedBy: session.id }),
+    });
+    const data = await res.json();
+    if (data.slotId) {
+      setWorkers(w => [...w, { id: emp.id, name: emp.name, slotId: data.slotId }]);
+    }
   }
+
+  async function adminRemove(worker) {
+    await fetch(`/api/schedule/${worker.slotId}`, { method: "DELETE" });
+    setWorkers(w => w.filter(x => x.slotId !== worker.slotId));
+  }
+
+  const unscheduled = allEmployees.filter((e) => !workers.some((w) => w.id === e.id));
 
   return (
     <div className="px-8 py-8 max-w-xl mx-auto space-y-6">
@@ -81,7 +89,7 @@ export default function SchedulePage() {
         ) : (
           <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden divide-y divide-gray-50">
             {workers.map((w) => (
-              <div key={w.id} className="flex items-center gap-3 px-5 py-4">
+              <div key={w.slotId ?? w.id} className="flex items-center gap-3 px-5 py-4">
                 <div className="w-8 h-8 rounded-full bg-accent/10 text-accent flex items-center justify-center text-xs font-bold flex-shrink-0">
                   {w.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)}
                 </div>
@@ -91,7 +99,7 @@ export default function SchedulePage() {
                 )}
                 {isAdmin && (
                   <button
-                    onClick={() => adminToggle(allEmployees.find((e) => e.id === w.id) || w)}
+                    onClick={() => adminRemove(w)}
                     className="ml-auto text-[10px] font-semibold text-red-400 hover:text-red-600 border border-red-100 hover:bg-red-50 px-2.5 py-1 rounded-lg transition-colors"
                   >
                     Remove
@@ -103,33 +111,29 @@ export default function SchedulePage() {
         )}
       </div>
 
-      {/* Admin: add any employee not yet scheduled */}
-      {isAdmin && (() => {
-        const unscheduled = allEmployees.filter((e) => !workers.some((w) => w.id === e.id));
-        if (unscheduled.length === 0) return null;
-        return (
-          <div>
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">Add Employee</h2>
-            <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden divide-y divide-gray-50">
-              {unscheduled.map((emp) => (
-                <div key={emp.id} className="flex items-center gap-3 px-5 py-4">
-                  <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold flex-shrink-0">
-                    {emp.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)}
-                  </div>
-                  <span className="text-sm font-medium text-primary">{emp.name}</span>
-                  <button
-                    onClick={() => adminToggle(emp)}
-                    className="ml-auto text-[10px] font-semibold bg-accent hover:bg-accent/90 text-primary px-3 py-1.5 rounded-lg transition-colors"
-                  >
-                    Add
-                  </button>
+      {/* Admin: add unscheduled employees */}
+      {isAdmin && unscheduled.length > 0 && (
+        <div>
+          <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">Add Employee</h2>
+          <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden divide-y divide-gray-50">
+            {unscheduled.map((emp) => (
+              <div key={emp.id} className="flex items-center gap-3 px-5 py-4">
+                <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold flex-shrink-0">
+                  {emp.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)}
                 </div>
-              ))}
-            </div>
+                <span className="text-sm font-medium text-primary">{emp.name}</span>
+                <button
+                  onClick={() => adminAdd(emp)}
+                  disabled={workers.length >= MAX_WORKERS}
+                  className="ml-auto text-[10px] font-semibold bg-accent hover:bg-accent/90 disabled:opacity-40 disabled:cursor-not-allowed text-primary px-3 py-1.5 rounded-lg transition-colors"
+                >
+                  Add
+                </button>
+              </div>
+            ))}
           </div>
-        );
-      })()}
-
+        </div>
+      )}
     </div>
   );
 }

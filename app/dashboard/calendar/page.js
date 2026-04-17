@@ -33,21 +33,19 @@ function toDateKey(year, month, day) {
   return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
-function loadSchedule() {
-  try { return JSON.parse(localStorage.getItem("ue_schedule") || "{}"); }
-  catch { return {}; }
-}
-
 const today         = new Date();
 const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
 
 export default function CalendarPage() {
   const router = useRouter();
-  const [month, setMonth]           = useState(today.getMonth());
-  const [schedule, setSchedule]     = useState({});
+  const [month, setMonth]       = useState(today.getMonth());
+  const [schedule, setSchedule] = useState({});
 
   useEffect(() => {
-    setSchedule(loadSchedule());
+    fetch("/api/schedule")
+      .then(r => r.json())
+      .then(data => setSchedule(data))
+      .catch(() => {});
   }, []);
 
   const cells = buildCalendar(YEAR, month);

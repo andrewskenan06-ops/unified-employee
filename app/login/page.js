@@ -1,11 +1,9 @@
 "use client";
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { loginByPin, getDefaultRoles } from "@/lib/auth";
+import { setSession } from "@/lib/auth";
 
 const GEOFENCE = { lat: 40.8610, lng: -73.8837, radiusFt: 1000 };
-const LS_KEY       = "ue_time_records";
-const LS_ROLES_KEY = "ue_employee_roles";
 
 const YARD_CHECKLIST = {
   in:  [
@@ -36,24 +34,6 @@ function haversineDistanceFt(lat1, lon1, lat2, lon2) {
   const dLon = toRad(lon2 - lon1);
   const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-function loadRecords() {
-  try { return JSON.parse(localStorage.getItem(LS_KEY) || "[]"); }
-  catch { return []; }
-}
-
-function saveRecords(r) { localStorage.setItem(LS_KEY, JSON.stringify(r)); }
-
-function getJobRole(userId) {
-  try {
-    let roles = JSON.parse(localStorage.getItem(LS_ROLES_KEY) || "{}");
-    if (Object.keys(roles).length === 0) {
-      roles = getDefaultRoles();
-      localStorage.setItem(LS_ROLES_KEY, JSON.stringify(roles));
-    }
-    return roles[userId] || null;
-  } catch { return null; }
 }
 
 function ChecklistModal({ slides, direction, onComplete, onCancel }) {
@@ -96,80 +76,88 @@ function ChecklistModal({ slides, direction, onComplete, onCancel }) {
 
 export default function PinPage() {
   const router = useRouter();
-  const [digits, setDigits]       = useState([]);
-  const [shake, setShake]         = useState(false);
-  const [stage, setStage]         = useState("pin"); // pin | locating | checklist | success
-  const [user, setUser]           = useState(null);
-  const [direction, setDirection] = useState(null);
-  const [activeRecord, setActiveRecord] = useState(null);
-  const [checklist, setChecklist] = useState(null);
-  const [result, setResult]       = useState(null); // { flagged, dist, time }
+  const [digits, setDigits]             = useState([]);
+  const [shake, setShake]               = useState(false);
+  const [stage, setStage]               = useState("pin"); // pin | locating | checklist | success
+  const [user, setUser]                 = useState(null);
+  const [direction, setDirection]       = useState(null);
+  const [activeRecordId, setActiveRecordId] = useState(null);
+  const [checklist, setChecklist]       = useState(null);
+  const [result, setResult]             = useState(null);
 
   const triggerShake = () => {
     setShake(true);
     setTimeout(() => { setShake(false); setDigits([]); }, 600);
   };
 
-  const executeClock = useCallback(async (resolvedUser, dir, active) => {
+  const executeClock = useCallback(async (resolvedUser, dir, recordId) => {
     setStage("locating");
     try {
       const pos = await new Promise((res, rej) =>
         navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true, timeout: 10000 })
       );
       const { latitude: lat, longitude: lng } = pos.coords;
-      const dist    = Math.round(haversineDistanceFt(lat, lng, GEOFENCE.lat, GEOFENCE.lng));
-      const flagged = dist > GEOFENCE.radiusFt;
-      const time    = new Date().toISOString();
-      const punch   = { time, lat, lng, distanceFt: dist, flagged };
+      const distanceFt = Math.round(haversineDistanceFt(lat, lng, GEOFENCE.lat, GEOFENCE.lng));
+      const flagged    = distanceFt > GEOFENCE.radiusFt;
+      const time       = new Date().toISOString();
+      const punch      = { time, lat, lng, distanceFt, flagged };
 
-      const current = loadRecords();
-      let next;
       if (dir === "in") {
-        next = [
-          { id: crypto.randomUUID(), employeeId: resolvedUser.id, employeeName: resolvedUser.name, date: time, clockIn: punch, clockOut: null, status: "active", flagged },
-          ...current,
-        ];
+        await fetch("/api/time-records", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ employeeId: resolvedUser.id, clockIn: punch }),
+        });
       } else {
-        next = current.map((r) =>
-          r.id === active.id
-            ? { ...r, clockOut: punch, status: "complete", flagged: r.flagged || flagged }
-            : r
-        );
+        await fetch(`/api/time-records/${recordId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ clockOut: punch }),
+        });
       }
-      saveRecords(next);
-      setResult({ flagged, dist, time, dir });
-      setStage("success");
+
+      setResult({ flagged, distanceFt, time, dir });
     } catch {
       setResult({ error: true, dir });
-      setStage("success");
     }
+    setStage("success");
   }, []);
 
-  const submitPin = useCallback((pin) => {
-    const matched = loginByPin(pin);
-    if (!matched) { triggerShake(); return; }
+  const submitPin = useCallback(async (pin) => {
+    const res  = await fetch("/api/auth/pin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pin }),
+    });
+    const data = await res.json();
 
-    // Admin goes straight to dashboard — no clock action
-    if (matched.role === "admin") { router.push("/dashboard"); return; }
+    if (!res.ok) { triggerShake(); return; }
 
-    const records = loadRecords();
-    const active  = records.find((r) => r.employeeId === matched.id && r.status === "active") || null;
-    const dir     = active ? "out" : "in";
+    const { user: matched, activeRecordId: recordId } = data;
 
+    // Admin — just set session and go to dashboard
+    if (matched.role === "admin") {
+      setSession(matched);
+      router.push("/dashboard");
+      return;
+    }
+
+    setSession(matched);
     setUser(matched);
-    setDirection(dir);
-    setActiveRecord(active);
 
-    const jobRole = getJobRole(matched.id);
-    const slides  = jobRole === "Yard Worker"   ? YARD_CHECKLIST[dir]
-                  : jobRole === "Office Worker" ? OFFICE_CHECKLIST[dir]
-                  : null;
+    const dir = recordId ? "out" : "in";
+    setDirection(dir);
+    setActiveRecordId(recordId);
+
+    const slides = matched.jobRole === "Yard Worker"   ? YARD_CHECKLIST[dir]
+                 : matched.jobRole === "Office Worker" ? OFFICE_CHECKLIST[dir]
+                 : null;
 
     if (slides) {
       setChecklist(slides);
       setStage("checklist");
     } else {
-      executeClock(matched, dir, active);
+      executeClock(matched, dir, recordId);
     }
   }, [router, executeClock]);
 
@@ -180,21 +168,16 @@ export default function PinPage() {
     if (next.length === 4) submitPin(next.join(""));
   }
 
-  function handleContinue() {
-    router.push("/dashboard");
-  }
-
-  const KEYS = [1,2,3,4,5,6,7,8,9,null,0,"⌫"];
+  const KEYS = [1, 2, 3, 4, 5, 6, 7, 8, 9, null, 0, "⌫"];
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-primary px-4">
 
-      {/* Checklist modal */}
       {stage === "checklist" && checklist && (
         <ChecklistModal
           slides={checklist}
           direction={direction}
-          onComplete={() => { setChecklist(null); executeClock(user, direction, activeRecord); }}
+          onComplete={() => { setChecklist(null); executeClock(user, direction, activeRecordId); }}
           onCancel={() => { setChecklist(null); setDigits([]); setStage("pin"); }}
         />
       )}
@@ -219,27 +202,23 @@ export default function PinPage() {
         {/* PIN entry */}
         {(stage === "pin" || stage === "checklist") && (
           <div className="space-y-6">
-            {/* Dot display */}
-            <div className={`flex justify-center gap-4 transition-all ${shake ? "animate-[shake_0.5s_ease]" : ""}`}>
-              {[0,1,2,3].map((i) => (
+            <div className={`flex justify-center gap-4 ${shake ? "animate-[shake_0.5s_ease]" : ""}`}>
+              {[0, 1, 2, 3].map((i) => (
                 <div key={i} className={`w-4 h-4 rounded-full border-2 transition-all duration-150 ${
                   digits.length > i ? "bg-accent border-accent" : "border-white/30"
                 }`} />
               ))}
             </div>
 
-            {/* Numpad */}
             <div className="grid grid-cols-3 gap-3">
               {KEYS.map((k, i) => {
                 if (k === null) return <div key={i} />;
                 return (
                   <button
                     key={i}
-                    onClick={() => k === "⌫" ? setDigits(d => d.slice(0,-1)) : handleDigit(k)}
+                    onClick={() => k === "⌫" ? setDigits(d => d.slice(0, -1)) : handleDigit(k)}
                     className={`h-16 rounded-2xl font-bold text-xl transition-all active:scale-95 ${
-                      k === "⌫"
-                        ? "bg-white/10 text-white/60 hover:bg-white/20"
-                        : "bg-white/10 hover:bg-white/20 text-white"
+                      k === "⌫" ? "bg-white/10 text-white/60 hover:bg-white/20" : "bg-white/10 hover:bg-white/20 text-white"
                     }`}
                   >
                     {k}
@@ -261,48 +240,44 @@ export default function PinPage() {
         {/* Success card */}
         {stage === "success" && result && (
           <div className="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-5">
-            {result.error ? (
-              <div className="text-center space-y-2">
-                <div className="w-12 h-12 mx-auto rounded-full bg-yellow-500/20 flex items-center justify-center">
-                  <svg width="22" height="22" fill="none" stroke="#eab308" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <div className="text-center space-y-2">
+              <div className={`w-12 h-12 mx-auto rounded-full flex items-center justify-center ${
+                result.error ? "bg-yellow-500/20" : result.flagged ? "bg-red-500/20" : "bg-accent/20"
+              }`}>
+                {result.error ? (
+                  <svg width="22" height="22" fill="none" stroke="#eab308" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
                     <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
                   </svg>
-                </div>
-                <p className="text-white font-bold">Location unavailable</p>
-                <p className="text-white/50 text-xs">Punch saved — enable location for full accuracy</p>
+                ) : result.flagged ? (
+                  <svg width="22" height="22" fill="none" stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                    <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                  </svg>
+                ) : (
+                  <svg width="22" height="22" fill="none" stroke="#00ce7c" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20,6 9,17 4,12"/>
+                  </svg>
+                )}
               </div>
-            ) : (
-              <div className="text-center space-y-2">
-                <div className={`w-12 h-12 mx-auto rounded-full flex items-center justify-center ${result.flagged ? "bg-red-500/20" : "bg-accent/20"}`}>
-                  {result.flagged ? (
-                    <svg width="22" height="22" fill="none" stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                      <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-                    </svg>
-                  ) : (
-                    <svg width="22" height="22" fill="none" stroke="#00ce7c" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="20,6 9,17 4,12"/>
-                    </svg>
-                  )}
-                </div>
-                <p className="text-white font-bold text-lg">
-                  {user?.name?.split(" ")[0]},{" "}
-                  {result.dir === "in" ? "you're clocked in" : "you're clocked out"}
-                </p>
+              <p className="text-white font-bold text-lg">
+                {result.error
+                  ? "Location unavailable"
+                  : `${user?.name?.split(" ")[0]}, you're clocked ${result.dir}`}
+              </p>
+              {!result.error && (
                 <p className="text-white/50 text-sm tabular-nums">
                   {new Date(result.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                 </p>
-                {result.flagged && (
-                  <p className="text-red-400 text-xs font-semibold">
-                    ⚠ {result.dist}ft from site — flagged for review
-                  </p>
-                )}
-              </div>
-            )}
-
+              )}
+              {result.flagged && (
+                <p className="text-red-400 text-xs font-semibold">
+                  ⚠ {result.distanceFt}ft from site — flagged for review
+                </p>
+              )}
+            </div>
             <button
-              onClick={handleContinue}
+              onClick={() => router.push("/dashboard")}
               className="w-full bg-accent hover:bg-accent/90 text-primary font-bold py-3 rounded-xl text-sm transition-colors"
             >
               Continue to Dashboard

@@ -1,19 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { getSession, getDefaultRoles } from "@/lib/auth";
-
-const LS_KEY       = "ue_time_records";
-const LS_ROLES_KEY = "ue_employee_roles";
-
-function loadRecords() {
-  try { return JSON.parse(localStorage.getItem(LS_KEY) || "[]"); }
-  catch { return []; }
-}
-
-function loadRoles() {
-  try { return JSON.parse(localStorage.getItem(LS_ROLES_KEY) || "{}"); }
-  catch { return {}; }
-}
+import { getSession } from "@/lib/auth";
 
 function fmtTime(iso) {
   if (!iso) return "—";
@@ -35,28 +22,30 @@ function calcDuration(inIso, outIso) {
 function isSameDay(isoDate, refDate) {
   const d = new Date(isoDate);
   return d.getFullYear() === refDate.getFullYear() &&
-    d.getMonth()    === refDate.getMonth() &&
-    d.getDate()     === refDate.getDate();
+    d.getMonth()  === refDate.getMonth() &&
+    d.getDate()   === refDate.getDate();
 }
 
 export default function TimePage() {
-  const [session, setSession] = useState(null);
-  const [records, setRecords] = useState([]);
-  const [jobRole, setJobRole] = useState(null);
-  const [now, setNow]         = useState(new Date());
+  const [session, setSession]   = useState(null);
+  const [records, setRecords]   = useState([]);
+  const [now, setNow]           = useState(new Date());
+  const [loading, setLoading]   = useState(true);
 
   useEffect(() => {
     const s = getSession();
     setSession(s);
-    setRecords(loadRecords());
-    if (s) {
-      let roles = loadRoles();
-      if (Object.keys(roles).length === 0) {
-        roles = getDefaultRoles();
-        localStorage.setItem(LS_ROLES_KEY, JSON.stringify(roles));
-      }
-      setJobRole(roles[s.id] || null);
-    }
+    if (!s) { setLoading(false); return; }
+
+    const url = s.role === "admin"
+      ? "/api/time-records"
+      : `/api/time-records?employeeId=${s.id}`;
+
+    fetch(url)
+      .then(r => r.json())
+      .then(data => { setRecords(data); setLoading(false); })
+      .catch(() => setLoading(false));
+
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
@@ -64,7 +53,6 @@ export default function TimePage() {
   if (!session) return null;
 
   const isAdmin        = session.role === "admin";
-  const visibleRecords = isAdmin ? records : records.filter((r) => r.employeeId === session.id);
   const flaggedCount   = records.filter((r) => r.flagged).length;
   const myRecords      = records.filter((r) => r.employeeId === session.id);
 
@@ -76,7 +64,6 @@ export default function TimePage() {
   return (
     <div className="px-8 py-8 max-w-5xl mx-auto space-y-6">
 
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-primary">Time Clock</h1>
@@ -94,11 +81,9 @@ export default function TimePage() {
         )}
       </div>
 
-      {/* Today + Yesterday card — employees only */}
+      {/* Today + Yesterday — employees only */}
       {!isAdmin && (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col gap-5 max-w-sm">
-
-          {/* Status pill */}
           <div className="flex items-center gap-2">
             <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full ${
               isClockedIn ? "bg-accent/10 text-accent" : "bg-gray-100 text-gray-500"
@@ -106,9 +91,9 @@ export default function TimePage() {
               <span className={`w-1.5 h-1.5 rounded-full ${isClockedIn ? "bg-accent animate-pulse" : "bg-gray-400"}`} />
               {isClockedIn ? "Currently clocked in" : "Not clocked in"}
             </span>
-            {jobRole && (
+            {session.jobRole && (
               <span className="text-[10px] font-semibold bg-primary/5 text-primary px-2.5 py-1 rounded-full border border-primary/10">
-                {jobRole}
+                {session.jobRole}
               </span>
             )}
           </div>
@@ -187,7 +172,11 @@ export default function TimePage() {
           {isAdmin ? "All Punch Records" : "Your Punch History"}
         </h2>
 
-        {visibleRecords.length === 0 ? (
+        {loading ? (
+          <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center text-gray-400 text-sm">
+            Loading…
+          </div>
+        ) : records.length === 0 ? (
           <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center text-gray-400 text-sm">
             {isAdmin ? "No punch records yet." : "No records yet — clock in with your PIN to get started."}
           </div>
@@ -205,13 +194,13 @@ export default function TimePage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {visibleRecords.map((r) => (
+                {records.map((r) => (
                   <tr key={r.id} className={`transition-colors ${r.flagged ? "bg-red-50/50 hover:bg-red-50" : "hover:bg-gray-50"}`}>
                     <td className="px-5 py-4 text-gray-500 text-xs">{fmtDate(r.date)}</td>
                     {isAdmin && <td className="px-5 py-4 font-medium text-primary">{r.employeeName}</td>}
                     <td className="px-5 py-4 tabular-nums">
-                      <span className={r.clockIn.flagged ? "text-red-600 font-semibold" : "text-gray-700"}>{fmtTime(r.clockIn.time)}</span>
-                      {r.clockIn.flagged && <span className="ml-1.5 text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full font-semibold">{r.clockIn.distanceFt}ft</span>}
+                      <span className={r.clockIn?.flagged ? "text-red-600 font-semibold" : "text-gray-700"}>{fmtTime(r.clockIn?.time)}</span>
+                      {r.clockIn?.flagged && <span className="ml-1.5 text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full font-semibold">{r.clockIn.distanceFt}ft</span>}
                     </td>
                     <td className="px-5 py-4 tabular-nums">
                       {r.clockOut ? (
@@ -223,7 +212,7 @@ export default function TimePage() {
                         <span className="text-accent font-medium text-xs">Active</span>
                       )}
                     </td>
-                    <td className="px-5 py-4 text-gray-500 text-xs tabular-nums">{calcDuration(r.clockIn.time, r.clockOut?.time) ?? "—"}</td>
+                    <td className="px-5 py-4 text-gray-500 text-xs tabular-nums">{calcDuration(r.clockIn?.time, r.clockOut?.time) ?? "—"}</td>
                     <td className="px-5 py-4">
                       {r.flagged ? (
                         <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-700 bg-red-100 px-2.5 py-1 rounded-full">

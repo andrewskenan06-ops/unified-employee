@@ -1,20 +1,9 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { getSession, getEmployees, getDefaultRoles } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 
 const JOB_ROLES = ["Office Worker", "Yard Worker", "Truck Driver", "Dirt Manager"];
-
-const LS_KEY = "ue_employee_roles";
-
-function loadRoles() {
-  try { return JSON.parse(localStorage.getItem(LS_KEY) || "{}"); }
-  catch { return {}; }
-}
-
-function saveRoles(data) {
-  localStorage.setItem(LS_KEY, JSON.stringify(data));
-}
 
 const ROLE_STYLES = {
   "Office Worker": { bg: "bg-blue-50",   text: "text-blue-700",   border: "border-blue-200" },
@@ -25,37 +14,42 @@ const ROLE_STYLES = {
 
 export default function EmployeesPage() {
   const router = useRouter();
-  const [session, setSession] = useState(null);
-  const [roles, setRoles] = useState({});
-  const [editing, setEditing] = useState(null); // employee id being edited
-
-  const employees = getEmployees();
+  const [session, setSession]   = useState(null);
+  const [employees, setEmployees] = useState([]);
+  const [editing, setEditing]   = useState(null);
+  const [loading, setLoading]   = useState(true);
 
   useEffect(() => {
     const s = getSession();
     if (!s) { router.replace("/login"); return; }
     if (s.role !== "admin") { router.replace("/dashboard"); return; }
     setSession(s);
-    const stored = loadRoles();
-    const seeded = Object.keys(stored).length === 0 ? getDefaultRoles() : stored;
-    if (Object.keys(stored).length === 0) saveRoles(seeded);
-    setRoles(seeded);
+
+    fetch("/api/employees")
+      .then(r => r.json())
+      .then(data => { setEmployees(data); setLoading(false); })
+      .catch(() => setLoading(false));
   }, [router]);
 
-  if (!session) return null;
+  if (!session || loading) return null;
 
-  function assignRole(employeeId, jobRole) {
-    const updated = { ...roles, [employeeId]: jobRole };
-    saveRoles(updated);
-    setRoles(updated);
+  async function assignRole(employeeId, jobRole) {
+    await fetch(`/api/employees/${employeeId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jobRole }),
+    });
+    setEmployees(emps => emps.map(e => e.id === employeeId ? { ...e, jobRole } : e));
     setEditing(null);
   }
 
-  function clearRole(employeeId) {
-    const updated = { ...roles };
-    delete updated[employeeId];
-    saveRoles(updated);
-    setRoles(updated);
+  async function clearRole(employeeId) {
+    await fetch(`/api/employees/${employeeId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jobRole: null }),
+    });
+    setEmployees(emps => emps.map(e => e.id === employeeId ? { ...e, jobRole: null } : e));
   }
 
   return (
@@ -67,33 +61,26 @@ export default function EmployeesPage() {
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-50">
         {employees.map((emp) => {
-          const jobRole = roles[emp.id] || null;
-          const style   = jobRole ? ROLE_STYLES[jobRole] : null;
-          const isOpen  = editing === emp.id;
+          const jobRole  = emp.jobRole || null;
+          const style    = jobRole ? ROLE_STYLES[jobRole] : null;
+          const isOpen   = editing === emp.id;
           const initials = emp.name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
 
           return (
             <div key={emp.id} className="px-6 py-5">
               <div className="flex items-center gap-4">
-                {/* Avatar */}
                 <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold flex-shrink-0">
                   {initials}
                 </div>
-
-                {/* Name */}
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-primary">{emp.name}</p>
                   <p className="text-xs text-gray-400">@{emp.username}</p>
                 </div>
-
-                {/* Current role badge */}
                 {jobRole && !isOpen && (
                   <span className={`text-xs font-semibold px-3 py-1 rounded-full border ${style.bg} ${style.text} ${style.border}`}>
                     {jobRole}
                   </span>
                 )}
-
-                {/* Edit / assign button */}
                 {!isOpen && (
                   <button
                     onClick={() => setEditing(emp.id)}
@@ -102,23 +89,17 @@ export default function EmployeesPage() {
                     {jobRole ? "Change" : "Assign Role"}
                   </button>
                 )}
-
-                {/* Cancel */}
                 {isOpen && (
-                  <button
-                    onClick={() => setEditing(null)}
-                    className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
-                  >
+                  <button onClick={() => setEditing(null)} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
                     Cancel
                   </button>
                 )}
               </div>
 
-              {/* Role picker — expands inline */}
               {isOpen && (
                 <div className="mt-4 ml-14 flex flex-wrap gap-2">
                   {JOB_ROLES.map((r) => {
-                    const s = ROLE_STYLES[r];
+                    const s      = ROLE_STYLES[r];
                     const active = jobRole === r;
                     return (
                       <button

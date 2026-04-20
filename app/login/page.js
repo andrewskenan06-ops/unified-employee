@@ -1,5 +1,5 @@
 "use client";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { setSession } from "@/lib/auth";
 
@@ -167,6 +167,16 @@ export default function PinPage() {
     setDigits(next);
     if (next.length === 4) submitPin(next.join(""));
   }
+
+  useEffect(() => {
+    function onKey(e) {
+      if (stage !== "pin" || shake) return;
+      if (e.key >= "0" && e.key <= "9") handleDigit(e.key);
+      if (e.key === "Backspace") setDigits(d => d.slice(0, -1));
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [stage, shake, digits]);
 
   const KEYS = [1, 2, 3, 4, 5, 6, 7, 8, 9, null, 0, "⌫"];
 

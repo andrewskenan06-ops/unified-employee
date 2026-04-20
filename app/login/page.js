@@ -277,7 +277,7 @@ export default function PinPage() {
               )}
             </div>
             <button
-              onClick={() => router.push("/dashboard")}
+              onClick={() => router.push("/dashboard/time")}
               className="w-full bg-accent hover:bg-accent/90 text-primary font-bold py-3 rounded-xl text-sm transition-colors"
             >
               Continue to Dashboard

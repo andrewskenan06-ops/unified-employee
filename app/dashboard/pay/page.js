@@ -18,11 +18,10 @@ function fmtDate(d) {
   return new Date(d + "T00:00:00").toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
 }
 
-function nextPayDate(period) {
+function nextPayDate() {
   const today = new Date();
-  const ref   = new Date("2026-04-24"); // last pay date
-  const days  = period === "weekly" ? 7 : 14;
-  while (ref <= today) ref.setDate(ref.getDate() + days);
+  const ref   = new Date("2026-04-24");
+  while (ref <= today) ref.setDate(ref.getDate() + 7);
   return ref.toLocaleDateString([], { month: "long", day: "numeric", year: "numeric" });
 }
 
@@ -73,13 +72,13 @@ function EmployeePayPage({ session }) {
               {pay.pay_type === "hourly" ? `${fmt$(pay.pay_rate)}/hr` : fmt$(pay.pay_rate)}
             </p>
             <p className="text-xs text-gray-400 mt-1 capitalize">
-              {pay.pay_type === "salary" ? "Annual salary" : "Hourly"} · {pay.pay_period === "biweekly" ? "Bi-weekly" : "Weekly"} pay
+              {pay.pay_type === "salary" ? "Annual salary" : "Hourly"} · Weekly pay
             </p>
           </div>
           <div className="border-t border-gray-100 pt-4 space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-gray-400">Next payday</span>
-              <span className="font-semibold text-primary">{nextPayDate(pay.pay_period)}</span>
+              <span className="font-semibold text-primary">{nextPayDate()}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-400">YTD Gross</span>
@@ -313,7 +312,6 @@ function AdminPayPage() {
                     <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Pay Period</label>
                     <select value={form.pay_period} onChange={e => setForm(f => ({ ...f, pay_period: e.target.value }))}
                       className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-primary focus:outline-none focus:border-accent">
-                      <option value="biweekly">Bi-weekly</option>
                       <option value="weekly">Weekly</option>
                     </select>
                   </div>

@@ -126,6 +126,8 @@ function EmployeePayPage({ session }) {
             <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Last Paycheck</p>
             <span className="text-xs text-gray-400">{fmtDate(latest.period_start)} – {fmtDate(latest.period_end)}</span>
           </div>
+
+          {/* Gross → Net */}
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs text-gray-400 uppercase tracking-wide">Gross Pay</p>
@@ -137,6 +139,28 @@ function EmployeePayPage({ session }) {
               <p className="text-2xl font-black text-accent tabular-nums">{fmt$(latest.net_pay)}</p>
             </div>
           </div>
+
+          {/* Hours + Earnings breakdown */}
+          {latest.hours_worked && (
+            <div className="border-t border-gray-100 pt-4 space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-widest text-gray-300 mb-3">Hours & Earnings</p>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-500">Regular ({latest.regular_hours}h)</span>
+                <span className="font-semibold tabular-nums text-primary">{fmt$(latest.regular_pay)}</span>
+              </div>
+              {Number(latest.overtime_hours) > 0 && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="flex items-center gap-2 text-amber-600 font-medium">
+                    Overtime ({latest.overtime_hours}h)
+                    <span className="text-[10px] font-semibold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">1.5×</span>
+                  </span>
+                  <span className="font-semibold tabular-nums text-amber-600">{fmt$(latest.overtime_pay)}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Deductions */}
           <div className="border-t border-gray-100 pt-4 space-y-2">
             <p className="text-xs font-semibold uppercase tracking-widest text-gray-300 mb-3">Deductions</p>
             {deductions.map(d => (
@@ -167,6 +191,11 @@ function EmployeePayPage({ session }) {
                     <p className="text-xs text-gray-400 mt-0.5">Paid {fmtDate(s.paid_at)}</p>
                   </div>
                   <div className="flex items-center gap-4">
+                    {Number(s.overtime_hours) > 0 && (
+                      <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
+                        {s.overtime_hours}h OT
+                      </span>
+                    )}
                     <div className="text-right">
                       <p className="text-xs text-gray-400">Net</p>
                       <p className="text-sm font-bold text-accent tabular-nums">{fmt$(s.net_pay)}</p>
@@ -180,19 +209,41 @@ function EmployeePayPage({ session }) {
 
                 {expanded === s.id && (
                   <div className="px-6 pb-5 space-y-2 bg-gray-50/50">
+                    {/* Earnings */}
+                    {s.hours_worked && (
+                      <>
+                        <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-300 pt-2">Earnings</p>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-400">Regular ({s.regular_hours}h)</span>
+                          <span className="font-semibold tabular-nums text-primary">{fmt$(s.regular_pay)}</span>
+                        </div>
+                        {Number(s.overtime_hours) > 0 && (
+                          <div className="flex justify-between text-sm">
+                            <span className="flex items-center gap-1.5 text-amber-600">
+                              Overtime ({s.overtime_hours}h)
+                              <span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-1 py-0.5 rounded-full">1.5×</span>
+                            </span>
+                            <span className="font-semibold tabular-nums text-amber-600">{fmt$(s.overtime_pay)}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between text-sm pb-1">
+                          <span className="font-semibold text-gray-500">Gross Pay</span>
+                          <span className="font-bold tabular-nums text-primary">{fmt$(s.gross_pay)}</span>
+                        </div>
+                      </>
+                    )}
+                    {/* Deductions */}
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-300 pt-1">Deductions</p>
                     {[
-                      { label: "Gross Pay",      value: s.gross_pay,          accent: true  },
-                      { label: "Federal Tax",     value: `-${fmt$(s.federal_tax)}`            },
-                      { label: "State Tax",       value: `-${fmt$(s.state_tax)}`              },
-                      { label: "Social Security", value: `-${fmt$(s.social_security)}`        },
-                      { label: "Medicare",        value: `-${fmt$(s.medicare)}`               },
-                      { label: "Benefits",        value: `-${fmt$(s.benefits_deduction)}`     },
+                      { label: "Federal Tax",     value: `-${fmt$(s.federal_tax)}`         },
+                      { label: "State Tax",       value: `-${fmt$(s.state_tax)}`           },
+                      { label: "Social Security", value: `-${fmt$(s.social_security)}`     },
+                      { label: "Medicare",        value: `-${fmt$(s.medicare)}`            },
+                      { label: "Benefits",        value: `-${fmt$(s.benefits_deduction)}`  },
                     ].map(row => (
                       <div key={row.label} className="flex justify-between text-sm">
                         <span className="text-gray-400">{row.label}</span>
-                        <span className={`font-semibold tabular-nums ${row.accent ? "text-primary" : "text-red-500"}`}>
-                          {row.accent ? fmt$(row.value) : row.value}
-                        </span>
+                        <span className="font-semibold tabular-nums text-red-500">{row.value}</span>
                       </div>
                     ))}
                     <div className="flex justify-between text-sm pt-2 border-t border-gray-200">

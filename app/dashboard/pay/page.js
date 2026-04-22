@@ -15,7 +15,9 @@ function fmt$(n) {
 }
 
 function fmtDate(d) {
-  return new Date(d + "T00:00:00").toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
+  if (!d) return "—";
+  const date = new Date(String(d).includes("T") ? d : d + "T00:00:00");
+  return date.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
 }
 
 function nextPayDate() {
@@ -121,7 +123,7 @@ function EmployeePayPage({ session }) {
 
       {/* Last paycheck breakdown */}
       {latest && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5">
           <div className="flex items-center justify-between">
             <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Last Paycheck</p>
             <span className="text-xs text-gray-400">{fmtDate(latest.period_start)} – {fmtDate(latest.period_end)}</span>
@@ -140,23 +142,23 @@ function EmployeePayPage({ session }) {
             </div>
           </div>
 
-          {/* Hours + Earnings breakdown */}
-          {latest.hours_worked && (
-            <div className="border-t border-gray-100 pt-4 space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-widest text-gray-300 mb-3">Hours & Earnings</p>
+          {/* Hours & Earnings */}
+          {latest.hours_worked != null && (
+            <div className="border-t border-gray-100 pt-4 space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-widest text-gray-300">Hours & Earnings</p>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-500">Regular ({latest.regular_hours}h)</span>
+                <span className="text-gray-500">Regular — {Number(latest.regular_hours)}h @ {fmt$(pay.pay_rate)}/hr</span>
                 <span className="font-semibold tabular-nums text-primary">{fmt$(latest.regular_pay)}</span>
               </div>
-              {Number(latest.overtime_hours) > 0 && (
-                <div className="flex items-center justify-between text-sm">
-                  <span className="flex items-center gap-2 text-amber-600 font-medium">
-                    Overtime ({latest.overtime_hours}h)
-                    <span className="text-[10px] font-semibold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">1.5×</span>
-                  </span>
-                  <span className="font-semibold tabular-nums text-amber-600">{fmt$(latest.overtime_pay)}</span>
-                </div>
-              )}
+              <div className={`flex items-center justify-between text-sm rounded-xl px-3 py-2 ${Number(latest.overtime_hours) > 0 ? "bg-amber-50 border border-amber-100" : "bg-gray-50 border border-gray-100"}`}>
+                <span className="flex items-center gap-2 font-medium text-amber-700">
+                  Overtime — {Number(latest.overtime_hours)}h
+                  <span className="text-[10px] font-bold bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded-full">1.5×</span>
+                </span>
+                <span className={`font-bold tabular-nums ${Number(latest.overtime_hours) > 0 ? "text-amber-700" : "text-gray-400"}`}>
+                  {Number(latest.overtime_hours) > 0 ? fmt$(latest.overtime_pay) : "$0.00"}
+                </span>
+              </div>
             </div>
           )}
 

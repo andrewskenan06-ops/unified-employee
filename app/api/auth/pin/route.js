@@ -6,12 +6,13 @@ export async function POST(request) {
     if (!pin) return Response.json({ error: "PIN required" }, { status: 400 });
 
     const users = await sql`
-      SELECT id, name, role, username, job_role AS "jobRole"
+      SELECT id, name, role, username, job_role AS "jobRole", status
       FROM users WHERE pin = ${pin}
     `;
     if (users.length === 0) return Response.json({ error: "Invalid PIN" }, { status: 401 });
 
     const user = users[0];
+    if (user.status === "inactive") return Response.json({ error: "Account inactive" }, { status: 403 });
 
     const active = await sql`
       SELECT id FROM time_records

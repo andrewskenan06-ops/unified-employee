@@ -3,8 +3,14 @@ import sql from "@/lib/db";
 export async function PATCH(request, { params }) {
   try {
     const { id } = await params;
-    const { clockOut } = await request.json();
+    const body = await request.json();
 
+    if ("approved" in body) {
+      await sql`UPDATE time_records SET approved = ${body.approved} WHERE id = ${id}`;
+      return Response.json({ ok: true });
+    }
+
+    const { clockOut } = body;
     await sql`
       UPDATE time_records SET
         clock_out          = ${clockOut.time},

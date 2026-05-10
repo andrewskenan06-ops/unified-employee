@@ -29,17 +29,18 @@ export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const employeeId = searchParams.get("employeeId");
+    const from       = searchParams.get("from");
+    const to         = searchParams.get("to");
 
-    const records = employeeId
-      ? await sql`
-          SELECT tr.*, u.name AS employee_name FROM time_records tr
-          JOIN users u ON u.id = tr.employee_id
-          WHERE tr.employee_id = ${employeeId}
-          ORDER BY tr.clock_in DESC`
-      : await sql`
-          SELECT tr.*, u.name AS employee_name FROM time_records tr
-          JOIN users u ON u.id = tr.employee_id
-          ORDER BY tr.clock_in DESC`;
+    const records = await sql`
+      SELECT tr.*, u.name AS employee_name FROM time_records tr
+      JOIN users u ON u.id = tr.employee_id
+      WHERE 1=1
+        ${employeeId ? sql`AND tr.employee_id = ${employeeId}` : sql``}
+        ${from ? sql`AND tr.clock_in >= ${from}` : sql``}
+        ${to   ? sql`AND tr.clock_in <  ${to}`   : sql``}
+      ORDER BY tr.clock_in DESC
+      LIMIT 500`;
 
     return Response.json(records.map(fmt));
   } catch (e) {

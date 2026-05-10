@@ -3,29 +3,41 @@ import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { setSession } from "@/lib/auth";
 
+function extractYouTubeId(url) {
+  const match = url?.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\s]+)/);
+  return match?.[1] ?? null;
+}
+
+function VideoSlide({ url, onEnded }) {
+  const ytId = extractYouTubeId(url);
+
+  useEffect(() => {
+    if (!ytId) return;
+    function onMessage(e) {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.event === "infoDelivery" && data.info?.playerState === 0) onEnded();
+      } catch {}
+    }
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [ytId, onEnded]);
+
+  if (ytId) {
+    return (
+      <iframe
+        src={`https://www.youtube.com/embed/${ytId}?enablejsapi=1&rel=0`}
+        className="w-full aspect-video rounded-xl"
+        allow="autoplay; encrypted-media"
+        allowFullScreen
+      />
+    );
+  }
+  return <video src={url} controls className="w-full rounded-xl" onEnded={onEnded} />;
+}
+
 const GEOFENCE = { lat: 40.8610, lng: -73.8837, radiusFt: 1000 };
 
-const YARD_CHECKLIST = {
-  in:  [
-    { message: "Remember 3 points of contact at all times.", type: "acknowledge", button: "Okay, Got It" },
-    { message: "Do you have a charged and ready-to-go walkie talkie with you?", type: "confirm", button: "Yes" },
-  ],
-  out: [
-    { message: "Is the machine clean from all garbage?", type: "confirm", button: "Yes" },
-    { message: "Did you put up the walkie talkie and is it being charged?", type: "confirm", button: "Yes" },
-  ],
-};
-
-const OFFICE_CHECKLIST = {
-  in:  [
-    { message: "Check the missed calls list.", type: "acknowledge", button: "Okay" },
-    { message: "Remember to smile and make customers feel at home.", type: "acknowledge", button: "Okay" },
-  ],
-  out: [
-    { message: "Did you count the register?", type: "confirm", button: "Yes" },
-    { message: "Make sure the building is locked and the alarm is on.", type: "acknowledge", button: "Okay" },
-  ],
-};
 
 function haversineDistanceFt(lat1, lon1, lat2, lon2) {
   const R = 20902231;
@@ -37,13 +49,21 @@ function haversineDistanceFt(lat1, lon1, lat2, lon2) {
 }
 
 function ChecklistModal({ slides, direction, onComplete, onCancel }) {
-  const [slide, setSlide] = useState(0);
+  const [slide, setSlide]           = useState(0);
+  const [videoWatched, setVideoWatched] = useState(false);
   const current = slides[slide];
   const isLast  = slide === slides.length - 1;
+  const isVideo = current.type === "video";
+  const canProceed = !isVideo || videoWatched;
+
+  function advance() {
+    setVideoWatched(false);
+    isLast ? onComplete() : setSlide(s => s + 1);
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-primary/90 backdrop-blur-sm px-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+      <div className={`bg-white rounded-2xl shadow-2xl overflow-hidden ${isVideo ? "w-full max-w-2xl" : "w-full max-w-sm"}`}>
         <div className="h-1 bg-gray-100">
           <div className="h-1 bg-accent transition-all duration-300" style={{ width: `${((slide + 1) / slides.length) * 100}%` }} />
         </div>
@@ -52,10 +72,21 @@ function ChecklistModal({ slides, direction, onComplete, onCancel }) {
             {direction === "in" ? "Clocking In" : "Clocking Out"} · {slide + 1} of {slides.length}
           </span>
           <p className="text-lg font-bold text-primary leading-snug">{current.message}</p>
+
+          {isVideo && (
+            <div className="space-y-2">
+              <VideoSlide url={current.video_url} onEnded={() => setVideoWatched(true)} />
+              {!videoWatched && (
+                <p className="text-xs text-center text-gray-400">Watch the full video to continue</p>
+              )}
+            </div>
+          )}
+
           <div className="flex flex-col gap-2">
             <button
-              onClick={() => isLast ? onComplete() : setSlide(s => s + 1)}
-              className="w-full bg-accent hover:bg-accent/90 text-primary font-bold py-3.5 rounded-xl text-sm transition-colors"
+              onClick={advance}
+              disabled={!canProceed}
+              className="w-full bg-accent hover:bg-accent/90 text-primary font-bold py-3.5 rounded-xl text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {current.button}
             </button>
@@ -74,6 +105,16 @@ function ChecklistModal({ slides, direction, onComplete, onCancel }) {
   );
 }
 
+function resetKiosk(setDigits, setStage, setUser, setDirection, setActiveRecordId, setChecklist, setResult) {
+  setDigits([]);
+  setStage("pin");
+  setUser(null);
+  setDirection(null);
+  setActiveRecordId(null);
+  setChecklist(null);
+  setResult(null);
+}
+
 export default function PinPage() {
   const router = useRouter();
   const [digits, setDigits]             = useState([]);
@@ -84,6 +125,19 @@ export default function PinPage() {
   const [activeRecordId, setActiveRecordId] = useState(null);
   const [checklist, setChecklist]       = useState(null);
   const [result, setResult]             = useState(null);
+  const [questions, setQuestions]       = useState([]);
+
+  useEffect(() => {
+    fetch("/api/checklist").then(r => r.json()).then(setQuestions);
+  }, []);
+  const reset = () => resetKiosk(setDigits, setStage, setUser, setDirection, setActiveRecordId, setChecklist, setResult);
+
+  // Auto-reset 3 seconds after successful clock in/out
+  useEffect(() => {
+    if (stage !== "success") return;
+    const t = setTimeout(reset, 3000);
+    return () => clearTimeout(t);
+  }, [stage]);
 
   const triggerShake = () => {
     setShake(true);
@@ -135,10 +189,10 @@ export default function PinPage() {
 
     const { user: matched, activeRecordId: recordId } = data;
 
-    // Admin — just set session and go to dashboard
+    // Admin — go to admin dashboard
     if (matched.role === "admin") {
       setSession(matched);
-      router.push("/dashboard");
+      router.push("/admin");
       return;
     }
 
@@ -149,11 +203,11 @@ export default function PinPage() {
     setDirection(dir);
     setActiveRecordId(recordId);
 
-    const slides = matched.jobRole === "Yard Worker"   ? YARD_CHECKLIST[dir]
-                 : matched.jobRole === "Office Worker" ? OFFICE_CHECKLIST[dir]
-                 : null;
-
-    if (slides) {
+    const slides = questions
+      .filter(q => q.job_role === matched.jobRole && q.direction === dir)
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map(q => ({ message: q.message, type: q.type, button: q.button_text, video_url: q.video_url }));
+    if (slides.length > 0) {
       setChecklist(slides);
       setStage("checklist");
     } else {
@@ -286,12 +340,6 @@ export default function PinPage() {
                 </p>
               )}
             </div>
-            <button
-              onClick={() => router.push("/dashboard/time")}
-              className="w-full bg-accent hover:bg-accent/90 text-primary font-bold py-3 rounded-xl text-sm transition-colors"
-            >
-              Continue to Dashboard
-            </button>
           </div>
         )}
 

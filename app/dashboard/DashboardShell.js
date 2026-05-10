@@ -66,6 +66,15 @@ const NAV = [
       </svg>
     ),
   },
+  {
+    label: "My Tasks",
+    href: "/dashboard/tasks",
+    icon: (
+      <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="9,11 12,14 22,4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+      </svg>
+    ),
+  },
 ];
 
 export default function DashboardShell({ children }) {
@@ -76,13 +85,13 @@ export default function DashboardShell({ children }) {
 
   useEffect(() => {
     const s = getSession();
-    if (!s) { router.replace("/login"); }
+    if (!s) { router.replace("/staff"); }
     else { setSession(s); }
   }, [router]);
 
   function handleLogout() {
     logout();
-    router.replace("/login");
+    router.replace("/staff");
   }
 
   if (!session) return null;

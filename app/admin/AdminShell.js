@@ -16,6 +16,17 @@ const NAV = [
     ),
   },
   {
+    label: "Employee Portal",
+    href: "/employee",
+    external: true,
+    icon: (
+      <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 3H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/>
+        <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+      </svg>
+    ),
+  },
+  {
     label: "Employees",
     href: "/admin/employees",
     icon: (
@@ -103,16 +114,6 @@ const NAV = [
       </svg>
     ),
   },
-  {
-    label: "Employee Portal",
-    href: "/employee",
-    icon: (
-      <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M9 3H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/>
-        <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
-      </svg>
-    ),
-  },
 ];
 
 export default function AdminShell({ children }) {
@@ -154,8 +155,18 @@ export default function AdminShell({ children }) {
         </div>
 
         <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto overflow-x-hidden">
-          {NAV.map(({ href, label, icon }) => {
+          {NAV.map(({ href, label, icon, external }) => {
             const active = pathname === href;
+            if (external) {
+              return (
+                <Link key={href} href={href}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors bg-accent/10 text-accent hover:bg-accent/20"
+                >
+                  <span className="flex-shrink-0">{icon}</span>
+                  <span>{label}</span>
+                </Link>
+              );
+            }
             return (
               <Link key={href} href={href}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${

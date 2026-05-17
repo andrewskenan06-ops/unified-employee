@@ -10,7 +10,7 @@ import {
 } from '@/lib/workforce/briefings';
 import { checkClockInApprovalGate, getPendingDailyApprovals, reportMissedPunch } from '@/lib/workforce/daily-approvals';
 import { getBranding } from '@/lib/workforce/branding';
-import { sql } from '@/lib/db';
+import sql from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 

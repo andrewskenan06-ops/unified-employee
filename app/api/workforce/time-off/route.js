@@ -7,7 +7,7 @@ import {
   getOverlapsForPendingRequests, getApprovedOverlapForRange, getUpcomingApprovedTimeOff,
   approveTimeOff, denyTimeOff, cancelTimeOff, getEmployeeAccruals,
 } from '@/lib/workforce/time-off';
-import { sql } from '@/lib/db';
+import sql from '@/lib/db';
 
 async function getEitherSession() {
   return (await getEmployeeSession()) ?? (await getSession());

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSession, getEmployeeSession } from '@/lib/auth';
 import { requireTenantContext } from '@/lib/tenant';
 import { notifyAllEmployees, notifyEmployees } from '@/lib/workforce/notifications';
-import { sql } from '@/lib/db';
+import sql from '@/lib/db';
 
 async function getEitherSession() {
   return (await getEmployeeSession()) ?? (await getSession());

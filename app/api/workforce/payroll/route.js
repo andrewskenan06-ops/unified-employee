@@ -4,7 +4,7 @@ import { requireTenantContext } from '@/lib/tenant';
 import { getEmployeeByUserId, listEmployees } from '@/lib/workforce/employees';
 import { createPayrollRun, createCheckPayroll, getCheckPayrollStatus, syncEmployeeToCheck } from '@/lib/workforce/payroll';
 import { getEstimatedPayStubs } from '@/lib/workforce/pay-stub-estimator';
-import { sql } from '@/lib/db';
+import sql from '@/lib/db';
 
 async function getEitherSession() {
   return (await getEmployeeSession()) ?? (await getSession());

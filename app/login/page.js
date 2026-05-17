@@ -1,5 +1,5 @@
 "use client";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { setSession, setTenantId } from "@/lib/auth";
 
@@ -114,7 +114,7 @@ function resetKiosk(setDigits, setStage, setUser, setDirection, setActiveRecordI
   setResult(null);
 }
 
-export default function PinPage() {
+function PinPage() {
   const router       = useRouter();
   const searchParams = useSearchParams();
   const [digits, setDigits]             = useState([]);
@@ -378,5 +378,13 @@ export default function PinPage() {
 
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <PinPage />
+    </Suspense>
   );
 }

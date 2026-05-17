@@ -27,7 +27,7 @@ export default function AdminOverviewPage() {
   useEffect(() => {
     fetch("/api/admin/overview")
       .then(r => r.json())
-      .then(d => { setData(d); setFlagged(d.recentFlagged ?? []); setLoading(false); });
+      .then(d => { setData(d); setFlagged((d.recentFlagged ?? []).filter(r => r.approved === null)); setLoading(false); });
   }, []);
 
   async function setApproval(id, approved) {
@@ -127,44 +127,29 @@ export default function AdminOverviewPage() {
             <div className="px-6 py-8 text-center text-gray-400 text-sm">No flagged punches — all clear.</div>
           ) : (
             <div className="divide-y divide-gray-50">
-              {flagged.map((r) => {
-                const approved  = r.approved === true;
-                const rejected  = r.approved === false;
-                const pending   = r.approved == null;
-                return (
-                  <div key={r.id} className={`px-6 py-4 flex items-start gap-3 transition-colors ${approved ? "bg-emerald-50/40" : rejected ? "bg-red-50/40" : ""}`}>
-                    <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${approved ? "bg-emerald-400" : rejected ? "bg-red-300" : "bg-red-400"}`} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-primary">{r.name}</p>
-                      <p className="text-xs text-gray-400">{r.job_role ?? "—"} · {timeAgo(r.clock_in)}</p>
-                      <div className="flex gap-1.5 mt-0.5">
-                        {r.clock_in_dist_ft  && <span className="text-[10px] font-semibold text-red-500 bg-red-50 px-1.5 py-0.5 rounded-full">{r.clock_in_dist_ft}ft in</span>}
-                        {r.clock_out_dist_ft && <span className="text-[10px] font-semibold text-red-500 bg-red-50 px-1.5 py-0.5 rounded-full">{r.clock_out_dist_ft}ft out</span>}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      {pending && <>
-                        <button onClick={() => setApproval(r.id, true)}
-                          className="text-[11px] font-bold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3 py-1.5 rounded-lg transition-colors">
-                          Approve
-                        </button>
-                        <button onClick={() => setApproval(r.id, false)}
-                          className="text-[11px] font-bold text-red-500 bg-red-50 hover:bg-red-100 border border-red-200 px-3 py-1.5 rounded-lg transition-colors">
-                          Reject
-                        </button>
-                      </>}
-                      {approved && <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg">Approved</span>}
-                      {rejected && <span className="text-[11px] font-bold text-red-400 bg-red-50 border border-red-200 px-3 py-1.5 rounded-lg">Rejected</span>}
-                      {!pending && (
-                        <button onClick={() => setApproval(r.id, null)}
-                          className="text-[10px] text-gray-300 hover:text-gray-500 transition-colors px-1">
-                          undo
-                        </button>
-                      )}
+              {flagged.map((r) => (
+                <div key={r.id} className="px-6 py-4 flex items-start gap-3">
+                  <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0 bg-red-400" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-primary">{r.name}</p>
+                    <p className="text-xs text-gray-400">{r.job_role ?? "—"} · {timeAgo(r.clock_in)}</p>
+                    <div className="flex gap-1.5 mt-0.5">
+                      {r.clock_in_dist_ft  && <span className="text-[10px] font-semibold text-red-500 bg-red-50 px-1.5 py-0.5 rounded-full">{r.clock_in_dist_ft}ft in</span>}
+                      {r.clock_out_dist_ft && <span className="text-[10px] font-semibold text-red-500 bg-red-50 px-1.5 py-0.5 rounded-full">{r.clock_out_dist_ft}ft out</span>}
                     </div>
                   </div>
-                );
-              })}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <button onClick={() => setApproval(r.id, true)}
+                      className="text-[11px] font-bold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3 py-1.5 rounded-lg transition-colors">
+                      Approve
+                    </button>
+                    <button onClick={() => setApproval(r.id, false)}
+                      className="text-[11px] font-bold text-red-500 bg-red-50 hover:bg-red-100 border border-red-200 px-3 py-1.5 rounded-lg transition-colors">
+                      Reject
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>

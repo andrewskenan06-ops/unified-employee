@@ -1,9 +1,14 @@
 import sql from "@/lib/db";
+import { getTenantId } from "@/lib/tenant";
 
-export async function GET() {
+export async function GET(request) {
   try {
+    const tenantId = getTenantId(request);
+    if (!tenantId) return Response.json({ error: "Tenant required" }, { status: 400 });
+
     const rows = await sql`
       SELECT * FROM checklist_questions
+      WHERE tenant_id = ${tenantId}
       ORDER BY job_role, direction, sort_order`;
     return Response.json(rows);
   } catch (e) {
@@ -13,10 +18,13 @@ export async function GET() {
 
 export async function POST(request) {
   try {
+    const tenantId = getTenantId(request);
+    if (!tenantId) return Response.json({ error: "Tenant required" }, { status: 400 });
+
     const { job_role, direction, message, type, button_text, sort_order, video_url } = await request.json();
     const rows = await sql`
-      INSERT INTO checklist_questions (job_role, direction, message, type, button_text, sort_order, video_url)
-      VALUES (${job_role}, ${direction}, ${message}, ${type}, ${button_text ?? "Okay"}, ${sort_order ?? 0}, ${video_url ?? null})
+      INSERT INTO checklist_questions (tenant_id, job_role, direction, message, type, button_text, sort_order, video_url)
+      VALUES (${tenantId}, ${job_role}, ${direction}, ${message}, ${type}, ${button_text ?? "Okay"}, ${sort_order ?? 0}, ${video_url ?? null})
       RETURNING *`;
     return Response.json(rows[0]);
   } catch (e) {

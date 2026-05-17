@@ -1,15 +1,9 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
-
-const ROLE_COLORS = {
-  "Yard Worker":   { bg: "bg-emerald-50", text: "text-emerald-600", dot: "bg-emerald-400" },
-  "Office Worker": { bg: "bg-blue-50",    text: "text-blue-600",    dot: "bg-blue-400"    },
-  "Truck Driver":  { bg: "bg-orange-50",  text: "text-orange-600",  dot: "bg-orange-400"  },
-  "Dirt Manager":  { bg: "bg-amber-50",   text: "text-amber-700",   dot: "bg-amber-400"   },
-};
+import { roleStyle } from "@/lib/constants";
 
 function initials(name) {
   return name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
@@ -27,8 +21,11 @@ export default function AdminScheduleDetailPage() {
   const [session,      setSession]      = useState(null);
   const [workers,      setWorkers]      = useState([]);
   const [allEmployees, setAllEmployees] = useState([]);
+  const [jobRoles,     setJobRoles]     = useState([]);
   const [loading,      setLoading]      = useState(true);
   const [search,       setSearch]       = useState("");
+
+  const rolesMap = useMemo(() => Object.fromEntries(jobRoles.map(r => [r.name, r.color])), [jobRoles]);
 
   useEffect(() => {
     const s = getSession();
@@ -38,9 +35,11 @@ export default function AdminScheduleDetailPage() {
     Promise.all([
       fetch("/api/schedule").then(r => r.json()),
       fetch("/api/employees").then(r => r.json()),
-    ]).then(([schedule, employees]) => {
+      fetch("/api/job-roles").then(r => r.json()),
+    ]).then(([schedule, employees, roles]) => {
       setWorkers(schedule[date] || []);
       setAllEmployees(employees);
+      setJobRoles(roles);
       setLoading(false);
     }).catch(() => setLoading(false));
   }, [date, router]);
@@ -102,7 +101,7 @@ export default function AdminScheduleDetailPage() {
         ) : (
           <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden divide-y divide-gray-50">
             {workers.map(w => {
-              const rs = ROLE_COLORS[w.job_role] ?? { bg: "bg-gray-50", text: "text-gray-500", dot: "bg-gray-300" };
+              const rs = roleStyle(rolesMap[w.job_role]);
               return (
                 <div key={w.slotId ?? w.id} className="flex items-center gap-3 px-5 py-4">
                   <div className="w-9 h-9 rounded-xl bg-primary text-accent flex items-center justify-center text-xs font-black flex-shrink-0">
@@ -156,7 +155,7 @@ export default function AdminScheduleDetailPage() {
               <p className="px-5 py-6 text-sm text-gray-300 text-center italic">No employees match your search.</p>
             ) : (
               filtered.map(emp => {
-                const rs = ROLE_COLORS[emp.job_role] ?? { bg: "bg-gray-50", text: "text-gray-500", dot: "bg-gray-300" };
+                const rs = roleStyle(rolesMap[emp.job_role]);
                 return (
                   <div key={emp.id} className="flex items-center gap-3 px-5 py-3.5">
                     <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center text-xs font-black flex-shrink-0">

@@ -1,23 +1,18 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { getSession } from "@/lib/auth";
-
-const JOB_ROLES = ["Office Worker", "Yard Worker", "Truck Driver", "Dirt Manager"];
-
-const ROLE_STYLES = {
-  "Office Worker": { bg: "bg-blue-50",   text: "text-blue-700",   border: "border-blue-200" },
-  "Yard Worker":   { bg: "bg-amber-50",  text: "text-amber-700",  border: "border-amber-200" },
-  "Truck Driver":  { bg: "bg-violet-50", text: "text-violet-700", border: "border-violet-200" },
-  "Dirt Manager":  { bg: "bg-orange-50", text: "text-orange-700", border: "border-orange-200" },
-};
+import { roleStyle } from "@/lib/constants";
 
 export default function EmployeesPage() {
   const router = useRouter();
   const [session, setSession]   = useState(null);
   const [employees, setEmployees] = useState([]);
+  const [jobRoles, setJobRoles] = useState([]);
   const [editing, setEditing]   = useState(null);
   const [loading, setLoading]   = useState(true);
+
+  const rolesMap = useMemo(() => Object.fromEntries(jobRoles.map(r => [r.name, r.color])), [jobRoles]);
 
   useEffect(() => {
     const s = getSession();
@@ -25,10 +20,14 @@ export default function EmployeesPage() {
     if (s.role !== "admin") { router.replace("/dashboard"); return; }
     setSession(s);
 
-    fetch("/api/employees")
-      .then(r => r.json())
-      .then(data => { setEmployees(data); setLoading(false); })
-      .catch(() => setLoading(false));
+    Promise.all([
+      fetch("/api/employees").then(r => r.json()),
+      fetch("/api/job-roles").then(r => r.json()),
+    ]).then(([emps, roles]) => {
+      setEmployees(emps);
+      setJobRoles(roles);
+      setLoading(false);
+    }).catch(() => setLoading(false));
   }, [router]);
 
   if (!session || loading) return null;
@@ -62,7 +61,7 @@ export default function EmployeesPage() {
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-50">
         {employees.map((emp) => {
           const jobRole  = emp.jobRole || null;
-          const style    = jobRole ? ROLE_STYLES[jobRole] : null;
+          const style    = jobRole ? roleStyle(rolesMap[jobRole]) : null;
           const isOpen   = editing === emp.id;
           const initials = emp.name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
 
@@ -98,20 +97,20 @@ export default function EmployeesPage() {
 
               {isOpen && (
                 <div className="mt-4 ml-14 flex flex-wrap gap-2">
-                  {JOB_ROLES.map((r) => {
-                    const s      = ROLE_STYLES[r];
-                    const active = jobRole === r;
+                  {jobRoles.map((r) => {
+                    const s      = roleStyle(rolesMap[r.name]);
+                    const active = jobRole === r.name;
                     return (
                       <button
-                        key={r}
-                        onClick={() => assignRole(emp.id, r)}
+                        key={r.name}
+                        onClick={() => assignRole(emp.id, r.name)}
                         className={`text-xs font-semibold px-4 py-2 rounded-xl border transition-all ${
                           active
-                            ? `${s.bg} ${s.text} ${s.border} shadow-sm`
+                            ? `${s.bg} ${s.text} ${s.border ?? ""} shadow-sm`
                             : "bg-gray-50 text-gray-500 border-gray-200 hover:border-primary/30 hover:text-primary"
                         }`}
                       >
-                        {active && <span className="mr-1">✓</span>}{r}
+                        {active && <span className="mr-1">✓</span>}{r.name}
                       </button>
                     );
                   })}

@@ -10,15 +10,6 @@ const MONTH_NAMES = [
 ];
 const DAY_NAMES = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
-const DAY_HOURS = {
-  0: "Closed",
-  1: "6:30–4:30",
-  2: "6:30–4:30",
-  3: "6:30–4:30",
-  4: "6:30–4:30",
-  5: "6:30–4:30",
-  6: "8–11 AM",
-};
 
 function buildCalendar(year, month) {
   const firstDay = new Date(year, month, 1).getDay();
@@ -40,11 +31,16 @@ export default function CalendarPage() {
   const router = useRouter();
   const [month, setMonth]       = useState(today.getMonth());
   const [schedule, setSchedule] = useState({});
+  const [dayHours, setDayHours] = useState({ 0:"Closed", 1:"6:30–4:30", 2:"6:30–4:30", 3:"6:30–4:30", 4:"6:30–4:30", 5:"6:30–4:30", 6:"8–11 AM" });
 
   useEffect(() => {
     fetch("/api/schedule")
       .then(r => r.json())
       .then(data => setSchedule(data))
+      .catch(() => {});
+    fetch("/api/settings")
+      .then(r => r.json())
+      .then(cfg => { if (cfg.day_hours) setDayHours({ 0: "Closed", ...cfg.day_hours }); })
       .catch(() => {});
   }, []);
 
@@ -117,7 +113,7 @@ export default function CalendarPage() {
             const dateKey    = toDateKey(YEAR, month, day);
             const workers    = schedule[dateKey] || [];
             const count      = workers.length;
-            const hours      = DAY_HOURS[dow];
+            const hours      = dayHours[String(dow)];
             const satDate    = new Date(YEAR, month, day);
             const isPast     = satDate < todayMidnight;
             const isFull     = count >= 3;

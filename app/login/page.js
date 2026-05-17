@@ -1,7 +1,7 @@
 "use client";
 import { useState, useCallback, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { setSession } from "@/lib/auth";
+import { useRouter, useSearchParams } from "next/navigation";
+import { setSession, setTenantId } from "@/lib/auth";
 
 function extractYouTubeId(url) {
   const match = url?.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\s]+)/);
@@ -36,7 +36,6 @@ function VideoSlide({ url, onEnded }) {
   return <video src={url} controls className="w-full rounded-xl" onEnded={onEnded} />;
 }
 
-const GEOFENCE = { lat: 40.8610, lng: -73.8837, radiusFt: 1000 };
 
 
 function haversineDistanceFt(lat1, lon1, lat2, lon2) {
@@ -116,7 +115,8 @@ function resetKiosk(setDigits, setStage, setUser, setDirection, setActiveRecordI
 }
 
 export default function PinPage() {
-  const router = useRouter();
+  const router       = useRouter();
+  const searchParams = useSearchParams();
   const [digits, setDigits]             = useState([]);
   const [shake, setShake]               = useState(false);
   const [stage, setStage]               = useState("pin"); // pin | locating | checklist | success
@@ -126,18 +126,37 @@ export default function PinPage() {
   const [checklist, setChecklist]       = useState(null);
   const [result, setResult]             = useState(null);
   const [questions, setQuestions]       = useState([]);
+  const [companyName, setCompanyName]   = useState("Unified Employee");
+  const [tenantReady, setTenantReady]   = useState(false);
+  const [cfg,       setCfg]             = useState({ geofence_lat: 33.7488, geofence_lng: -84.3234, geofence_radius_ft: 1000, pin_length: 4, kiosk_reset_seconds: 3 });
 
   useEffect(() => {
+    const slug = searchParams.get("t");
+    if (!slug) { setTenantReady(true); return; }
+    fetch(`/api/tenants/${slug}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.id) {
+          setTenantId(data.id);
+          setCompanyName(data.name);
+        }
+        setTenantReady(true);
+      })
+      .catch(() => setTenantReady(true));
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!tenantReady) return;
     fetch("/api/checklist").then(r => r.json()).then(setQuestions);
-  }, []);
+    fetch("/api/settings").then(r => r.json()).then(s => setCfg(prev => ({ ...prev, ...s })));
+  }, [tenantReady]);
   const reset = () => resetKiosk(setDigits, setStage, setUser, setDirection, setActiveRecordId, setChecklist, setResult);
 
-  // Auto-reset 3 seconds after successful clock in/out
   useEffect(() => {
     if (stage !== "success") return;
-    const t = setTimeout(reset, 3000);
+    const t = setTimeout(reset, (cfg.kiosk_reset_seconds ?? 3) * 1000);
     return () => clearTimeout(t);
-  }, [stage]);
+  }, [stage, cfg.kiosk_reset_seconds]);
 
   const triggerShake = () => {
     setShake(true);
@@ -146,13 +165,27 @@ export default function PinPage() {
 
   const executeClock = useCallback(async (resolvedUser, dir, recordId) => {
     setStage("locating");
+
+    if (resolvedUser.allowMobileAnywhere) {
+      const time  = new Date().toISOString();
+      const punch = { time, lat: null, lng: null, distanceFt: null, flagged: false };
+      if (dir === "in") {
+        await fetch("/api/time-records", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ employeeId: resolvedUser.id, clockIn: punch }) });
+      } else {
+        await fetch(`/api/time-records/${recordId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clockOut: punch }) });
+      }
+      setResult({ flagged: false, distanceFt: null, time, dir });
+      setStage("success");
+      return;
+    }
+
     try {
       const pos = await new Promise((res, rej) =>
         navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true, timeout: 10000 })
       );
       const { latitude: lat, longitude: lng } = pos.coords;
-      const distanceFt = Math.round(haversineDistanceFt(lat, lng, GEOFENCE.lat, GEOFENCE.lng));
-      const flagged    = distanceFt > GEOFENCE.radiusFt;
+      const distanceFt = Math.round(haversineDistanceFt(lat, lng, cfg.geofence_lat, cfg.geofence_lng));
+      const flagged    = resolvedUser.requireGeofence === false ? false : distanceFt > cfg.geofence_radius_ft;
       const time       = new Date().toISOString();
       const punch      = { time, lat, lng, distanceFt, flagged };
 
@@ -175,7 +208,7 @@ export default function PinPage() {
       setResult({ error: true, dir });
     }
     setStage("success");
-  }, []);
+  }, [cfg]);
 
   const submitPin = useCallback(async (pin) => {
     const res  = await fetch("/api/auth/pin", {
@@ -219,7 +252,7 @@ export default function PinPage() {
     if (stage !== "pin" || shake) return;
     const next = [...digits, String(d)];
     setDigits(next);
-    if (next.length === 4) submitPin(next.join(""));
+    if (next.length === (cfg.pin_length ?? 4)) submitPin(next.join(""));
   }
 
   useEffect(() => {
@@ -254,7 +287,7 @@ export default function PinPage() {
             <span className="text-primary text-lg font-black tracking-tighter">UE</span>
           </div>
           <div className="text-center">
-            <h1 className="text-white text-xl font-bold">Unified Employee</h1>
+            <h1 className="text-white text-xl font-bold">{companyName}</h1>
             <p className="text-white/50 text-sm mt-1">
               {stage === "pin"      && "Enter your PIN"}
               {stage === "locating" && "Verifying location…"}
@@ -267,7 +300,7 @@ export default function PinPage() {
         {(stage === "pin" || stage === "checklist") && (
           <div className="space-y-6">
             <div className={`flex justify-center gap-4 ${shake ? "animate-[shake_0.5s_ease]" : ""}`}>
-              {[0, 1, 2, 3].map((i) => (
+              {Array.from({ length: cfg.pin_length ?? 4 }, (_, i) => i).map((i) => (
                 <div key={i} className={`w-4 h-4 rounded-full border-2 transition-all duration-150 ${
                   digits.length > i ? "bg-accent border-accent" : "border-white/30"
                 }`} />

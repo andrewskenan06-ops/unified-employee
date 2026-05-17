@@ -1,19 +1,7 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { getSession } from "@/lib/auth";
-
-const HEALTH_LABELS = { none: "No Coverage", basic: "Basic Plan", premium: "Premium Plan" };
-const HEALTH_STYLES = {
-  none:    { bg: "bg-gray-100",    text: "text-gray-500"   },
-  basic:   { bg: "bg-blue-50",     text: "text-blue-700"   },
-  premium: { bg: "bg-violet-50",   text: "text-violet-700" },
-};
-const ROLE_COLORS = {
-  "Yard Worker":   { bg: "bg-emerald-50", text: "text-emerald-600", dot: "bg-emerald-400" },
-  "Office Worker": { bg: "bg-blue-50",    text: "text-blue-600",    dot: "bg-blue-400"    },
-  "Truck Driver":  { bg: "bg-orange-50",  text: "text-orange-600",  dot: "bg-orange-400"  },
-  "Dirt Manager":  { bg: "bg-amber-50",   text: "text-amber-700",   dot: "bg-amber-400"   },
-};
+import { roleStyle as getRoleStyle, healthStyle, nextPayDate as calcNextPayDate } from "@/lib/constants";
 
 function fmt$(n) {
   return Number(n).toLocaleString("en-US", { style: "currency", currency: "USD" });
@@ -23,19 +11,13 @@ function fmtDate(d) {
   const date = new Date(String(d).includes("T") ? d : d + "T00:00:00");
   return date.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
 }
-function nextPayDate() {
-  const today = new Date();
-  const ref   = new Date("2026-04-24");
-  while (ref <= today) ref.setDate(ref.getDate() + 7);
-  return ref.toLocaleDateString([], { month: "long", day: "numeric", year: "numeric" });
-}
 function initials(name) {
   return name?.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2) ?? "??";
 }
 
 const INPUT = "w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-primary focus:outline-none focus:border-accent transition-colors";
 
-function EditForm({ f, setF, df, setDf, onSave, onCancel, isSaving }) {
+function EditForm({ f, setF, df, setDf, onSave, onCancel, isSaving, healthPlans }) {
   return (
     <div className="bg-white rounded-2xl border border-primary/10 shadow-sm overflow-hidden">
       <div className="px-6 py-4 border-b border-gray-50 bg-primary/5">
@@ -69,7 +51,7 @@ function EditForm({ f, setF, df, setDf, onSave, onCancel, isSaving }) {
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block">Health Plan</label>
               <select value={f.health_plan} onChange={e => setF(x => ({ ...x, health_plan: e.target.value }))} className={INPUT}>
-                <option value="none">No Coverage</option><option value="basic">Basic Plan</option><option value="premium">Premium Plan</option>
+                {(healthPlans ?? []).map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
               </select>
             </div>
             <div className="space-y-1.5">
@@ -120,7 +102,12 @@ function EditForm({ f, setF, df, setDf, onSave, onCancel, isSaving }) {
   );
 }
 
-function PayCards({ pay, benefits, latestStub, ytdVal }) {
+function PayCards({ pay, benefits, latestStub, ytdVal, healthPlans, payDate, otMultiplier }) {
+  const hValue = benefits?.health_plan ?? "none";
+  const hPlan  = (healthPlans ?? []).find(p => p.value === hValue);
+  const hLabel = hPlan?.label ?? hValue;
+  const hStyle = healthStyle(hValue, healthPlans ?? []);
+  const otMult = otMultiplier ?? 1.5;
   return (
     <div className="grid grid-cols-3 gap-4">
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
@@ -132,19 +119,19 @@ function PayCards({ pay, benefits, latestStub, ytdVal }) {
           <p className="text-xs text-gray-400 mt-1 capitalize">{pay?.pay_type === "salary" ? "Annual salary" : "Hourly"} · Weekly pay</p>
         </div>
         <div className="border-t border-gray-100 pt-4 space-y-2">
-          <div className="flex justify-between text-sm"><span className="text-gray-400">Next payday</span><span className="font-semibold text-primary">{nextPayDate()}</span></div>
+          <div className="flex justify-between text-sm"><span className="text-gray-400">Next payday</span><span className="font-semibold text-primary">{payDate}</span></div>
           <div className="flex justify-between text-sm"><span className="text-gray-400">YTD Gross</span><span className="font-semibold text-accent">{fmt$(ytdVal)}</span></div>
         </div>
       </div>
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
         <div className="flex items-center gap-2">
           <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Overtime</p>
-          <span className="text-[10px] font-bold bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded-full">1.5×</span>
+          <span className="text-[10px] font-bold bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded-full">{otMult}×</span>
         </div>
         {latestStub ? (
           <div className="space-y-3">
             <div className="flex justify-between text-sm"><span className="text-gray-400">Hours over 60</span><span className="font-semibold text-primary">{Number(latestStub.overtime_hours)}h</span></div>
-            <div className="flex justify-between text-sm"><span className="text-gray-400">Pay for 60+ hrs</span><span className="font-semibold text-primary">{pay?.pay_rate ? `${fmt$(Number(pay.pay_rate) * 1.5)}/hr` : "—"}</span></div>
+            <div className="flex justify-between text-sm"><span className="text-gray-400">Pay for 60+ hrs</span><span className="font-semibold text-primary">{pay?.pay_rate ? `${fmt$(Number(pay.pay_rate) * otMult)}/hr` : "—"}</span></div>
             <div className="border-t border-gray-100 pt-3 flex justify-between text-sm">
               <span className="font-semibold text-gray-500">Total</span>
               <span className={`font-black tabular-nums text-lg ${Number(latestStub.overtime_hours) > 0 ? "text-amber-600" : "text-gray-300"}`}>{fmt$(latestStub.overtime_pay)}</span>
@@ -156,7 +143,7 @@ function PayCards({ pay, benefits, latestStub, ytdVal }) {
         <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Benefits</p>
         <div className="space-y-2.5">
           {[
-            { label: "Health", value: HEALTH_LABELS[benefits?.health_plan ?? "none"], style: `${HEALTH_STYLES[benefits?.health_plan ?? "none"].bg} ${HEALTH_STYLES[benefits?.health_plan ?? "none"].text}` },
+            { label: "Health", value: hLabel, style: `${hStyle.bg} ${hStyle.text}` },
             { label: "Dental", value: benefits?.dental ? "Enrolled" : "Not enrolled", style: benefits?.dental ? "bg-accent/10 text-accent" : "bg-gray-100 text-gray-400" },
             { label: "Vision", value: benefits?.vision ? "Enrolled" : "Not enrolled", style: benefits?.vision ? "bg-accent/10 text-accent" : "bg-gray-100 text-gray-400" },
           ].map(row => (
@@ -241,7 +228,7 @@ function StubHistory({ stubs, expandedId, setExpandedId }) {
                   <div className="flex justify-between text-sm"><span className="text-gray-400">Regular ({s.regular_hours}h)</span><span className="font-semibold tabular-nums text-primary">{fmt$(s.regular_pay)}</span></div>
                   {Number(s.overtime_hours) > 0 && (
                     <div className="flex justify-between text-sm">
-                      <span className="flex items-center gap-1.5 text-amber-600">Overtime ({s.overtime_hours}h)<span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-1 py-0.5 rounded-full">1.5×</span></span>
+                      <span className="flex items-center gap-1.5 text-amber-600">Overtime ({s.overtime_hours}h)<span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-1 py-0.5 rounded-full">OT</span></span>
                       <span className="font-semibold tabular-nums text-amber-600">{fmt$(s.overtime_pay)}</span>
                     </div>
                   )}
@@ -262,10 +249,9 @@ function StubHistory({ stubs, expandedId, setExpandedId }) {
 }
 
 export default function AdminPayPage() {
-  const [tab,        setTab]       = useState("mine"); // "mine" | "team"
+  const [tab,        setTab]       = useState("mine");
   const [session,    setSession]   = useState(null);
 
-  // My Pay state
   const [myDetail,    setMyDetail]    = useState(null);
   const [myDeductCfg, setMyDeductCfg] = useState(null);
   const [myLoading,   setMyLoading]   = useState(true);
@@ -275,7 +261,6 @@ export default function AdminPayPage() {
   const [myDeductForm,setMyDeductForm]= useState({});
   const [mySaving,    setMySaving]    = useState(false);
 
-  // Team state
   const [employees, setEmployees] = useState([]);
   const [selected,  setSelected]  = useState(null);
   const [detail,    setDetail]    = useState(null);
@@ -288,6 +273,14 @@ export default function AdminPayPage() {
   const [saving,    setSaving]    = useState(false);
   const [expanded,  setExpanded]  = useState(null);
 
+  const [jobRoles,  setJobRoles]  = useState([]);
+  const [settings,  setSettings]  = useState({});
+
+  const rolesMap     = useMemo(() => Object.fromEntries(jobRoles.map(r => [r.name, r.color])), [jobRoles]);
+  const healthPlans  = settings.health_plans  ?? [{ value: "none", label: "No Coverage" }, { value: "basic", label: "Basic Plan" }, { value: "premium", label: "Premium Plan" }];
+  const otMultiplier = settings.overtime_multiplier ?? 1.5;
+  const payDate      = calcNextPayDate(settings.pay_period_ref_date, settings.pay_period);
+
   useEffect(() => {
     const s = getSession();
     setSession(s);
@@ -299,9 +292,16 @@ export default function AdminPayPage() {
     } else {
       setMyLoading(false);
     }
-    fetch("/api/pay")
-      .then(r => r.json())
-      .then(d => { setEmployees(d); setLoading(false); });
+    Promise.all([
+      fetch("/api/pay").then(r => r.json()),
+      fetch("/api/job-roles").then(r => r.json()),
+      fetch("/api/settings").then(r => r.json()),
+    ]).then(([emps, roles, cfg]) => {
+      setEmployees(emps);
+      setJobRoles(roles);
+      setSettings(cfg);
+      setLoading(false);
+    });
   }, []);
 
   function openMyEdit() {
@@ -423,8 +423,7 @@ export default function AdminPayPage() {
     setSaving(false);
   }
 
-  // Derived values for selected employee (Team tab)
-  const roleStyle = selected ? (ROLE_COLORS[selected.job_role] ?? { bg: "bg-gray-50", text: "text-gray-500", dot: "bg-gray-400" }) : null;
+  const selectedRoleStyle = selected ? getRoleStyle(rolesMap[selected.job_role]) : null;
   const latest = detail?.stubs?.[0];
   const ytd    = detail?.stubs?.reduce((sum, s) => sum + Number(s.gross_pay), 0) ?? 0;
   const deductionRows = latest ? [
@@ -436,7 +435,6 @@ export default function AdminPayPage() {
     { label: "Child Support", amount: deductCfg?.child_support ? deductCfg.child_support_amount : 0, color: deductCfg?.child_support ? "text-purple-600" : "text-gray-300" },
   ].filter(Boolean) : [];
 
-  // Derived values for My Pay tab
   const myLatest = myDetail?.stubs?.[0];
   const myYtd    = myDetail?.stubs?.reduce((sum, s) => sum + Number(s.gross_pay), 0) ?? 0;
   const myDeductionRows = myLatest ? [
@@ -488,8 +486,8 @@ export default function AdminPayPage() {
                 {myEditing && <button onClick={() => setMyEditing(false)} className="text-sm text-gray-400 hover:text-gray-600 px-4 py-2 rounded-xl hover:bg-white transition-colors">Cancel</button>}
               </div>
 
-              {myEditing && <EditForm f={myForm} setF={setMyForm} df={myDeductForm} setDf={setMyDeductForm} onSave={saveMyEdit} onCancel={() => setMyEditing(false)} isSaving={mySaving} />}
-              {!myEditing && <PayCards pay={myDetail?.pay} benefits={myDetail?.benefits} latestStub={myLatest} ytdVal={myYtd} />}
+              {myEditing && <EditForm f={myForm} setF={setMyForm} df={myDeductForm} setDf={setMyDeductForm} onSave={saveMyEdit} onCancel={() => setMyEditing(false)} isSaving={mySaving} healthPlans={healthPlans} />}
+              {!myEditing && <PayCards pay={myDetail?.pay} benefits={myDetail?.benefits} latestStub={myLatest} ytdVal={myYtd} healthPlans={healthPlans} payDate={payDate} otMultiplier={otMultiplier} />}
               {!myEditing && <LastPaycheck latestStub={myLatest} pay={myDetail?.pay} dRows={myDeductionRows} />}
               {!myEditing && <StubHistory stubs={myDetail?.stubs} expandedId={myExpanded} setExpandedId={setMyExpanded} />}
             </div>
@@ -509,7 +507,7 @@ export default function AdminPayPage() {
             {!loading && (
               <div className="flex-1 overflow-y-auto divide-y divide-gray-50">
                 {employees.map(emp => {
-                  const rs = ROLE_COLORS[emp.job_role] ?? { bg: "bg-gray-50", text: "text-gray-500", dot: "bg-gray-400" };
+                  const rs = getRoleStyle(rolesMap[emp.job_role]);
                   const isSelected = selected?.id === emp.id;
                   return (
                     <button key={emp.id} onClick={() => selectEmployee(emp)}
@@ -554,8 +552,8 @@ export default function AdminPayPage() {
                     <div className="w-12 h-12 rounded-xl bg-primary text-accent flex items-center justify-center text-sm font-black">{initials(selected.name)}</div>
                     <div>
                       <h2 className="text-xl font-bold text-primary">{selected.name}</h2>
-                      <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-full mt-0.5 ${roleStyle.bg} ${roleStyle.text}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${roleStyle.dot}`} />{selected.job_role}
+                      <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-full mt-0.5 ${selectedRoleStyle.bg} ${selectedRoleStyle.text}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${selectedRoleStyle.dot}`} />{selected.job_role}
                       </span>
                     </div>
                   </div>
@@ -566,8 +564,8 @@ export default function AdminPayPage() {
                     : <button onClick={() => setEditing(false)} className="text-sm text-gray-400 hover:text-gray-600 px-4 py-2 rounded-xl hover:bg-white transition-colors">Cancel</button>
                   }
                 </div>
-                {editing && <EditForm f={form} setF={setForm} df={deductForm} setDf={setDeductForm} onSave={saveEdit} onCancel={() => setEditing(false)} isSaving={saving} />}
-                {!editing && <PayCards pay={detail.pay} benefits={detail.benefits} latestStub={latest} ytdVal={ytd} />}
+                {editing && <EditForm f={form} setF={setForm} df={deductForm} setDf={setDeductForm} onSave={saveEdit} onCancel={() => setEditing(false)} isSaving={saving} healthPlans={healthPlans} />}
+                {!editing && <PayCards pay={detail.pay} benefits={detail.benefits} latestStub={latest} ytdVal={ytd} healthPlans={healthPlans} payDate={payDate} otMultiplier={otMultiplier} />}
                 {!editing && <LastPaycheck latestStub={latest} pay={detail.pay} dRows={deductionRows} />}
                 {!editing && <StubHistory stubs={detail.stubs} expandedId={expanded} setExpandedId={setExpanded} />}
               </div>

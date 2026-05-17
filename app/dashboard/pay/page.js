@@ -2,13 +2,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getSession } from "@/lib/auth";
-
-const HEALTH_LABELS = { none: "No Coverage", basic: "Basic Plan", premium: "Premium Plan" };
-const HEALTH_STYLES = {
-  none:    { bg: "bg-gray-100",    text: "text-gray-500"   },
-  basic:   { bg: "bg-blue-50",     text: "text-blue-700"   },
-  premium: { bg: "bg-violet-50",   text: "text-violet-700" },
-};
+import { healthStyle, nextPayDate as calcNextPayDate } from "@/lib/constants";
 
 function fmt$(n) {
   return Number(n).toLocaleString("en-US", { style: "currency", currency: "USD" });
@@ -20,17 +14,11 @@ function fmtDate(d) {
   return date.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
 }
 
-function nextPayDate() {
-  const today = new Date();
-  const ref   = new Date("2026-04-24");
-  while (ref <= today) ref.setDate(ref.getDate() + 7);
-  return ref.toLocaleDateString([], { month: "long", day: "numeric", year: "numeric" });
-}
-
 // ── Employee View ─────────────────────────────────────────────────
 function EmployeePayPage({ session }) {
   const [data, setData]         = useState(null);
   const [deductCfg, setDeductCfg] = useState(null);
+  const [settings, setSettings] = useState({});
   const [loading, setLoading]   = useState(true);
   const [expanded, setExpanded] = useState(null);
 
@@ -38,7 +26,8 @@ function EmployeePayPage({ session }) {
     Promise.all([
       fetch(`/api/pay/${session.id}`).then(r => r.json()),
       fetch(`/api/deductions/${session.id}`).then(r => r.json()),
-    ]).then(([d, dc]) => { setData(d); setDeductCfg(dc); setLoading(false); })
+      fetch("/api/settings").then(r => r.json()),
+    ]).then(([d, dc, cfg]) => { setData(d); setDeductCfg(dc); setSettings(cfg); setLoading(false); })
       .catch(() => setLoading(false));
   }, [session.id]);
 
@@ -46,8 +35,16 @@ function EmployeePayPage({ session }) {
   if (!data?.pay) return <div className="p-10 text-center text-gray-400 text-sm">No pay info set yet — contact your manager.</div>;
 
   const { pay, benefits, stubs } = data;
-  const latest = stubs?.[0];
-  const ytd    = stubs?.reduce((sum, s) => sum + Number(s.gross_pay), 0) ?? 0;
+  const latest    = stubs?.[0];
+  const ytd       = stubs?.reduce((sum, s) => sum + Number(s.gross_pay), 0) ?? 0;
+  const healthPlans  = settings.health_plans  ?? [{ value: "none", label: "No Coverage" }, { value: "basic", label: "Basic Plan" }, { value: "premium", label: "Premium Plan" }];
+  const otMultiplier = settings.overtime_multiplier ?? 1.5;
+  const payDate      = calcNextPayDate(settings.pay_period_ref_date, settings.pay_period);
+
+  const hValue = benefits?.health_plan ?? "none";
+  const hPlan  = healthPlans.find(p => p.value === hValue);
+  const hLabel = hPlan?.label ?? hValue;
+  const hStyle = healthStyle(hValue, healthPlans);
 
   const deductions = latest ? [
     deductCfg?.federal_tax     !== false && { label: "Federal Tax",     amount: latest.federal_tax,        color: "text-red-600" },
@@ -83,7 +80,7 @@ function EmployeePayPage({ session }) {
           <div className="border-t border-gray-100 pt-4 space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-gray-400">Next payday</span>
-              <span className="font-semibold text-primary">{nextPayDate()}</span>
+              <span className="font-semibold text-primary">{payDate}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-400">YTD Gross</span>
@@ -96,7 +93,7 @@ function EmployeePayPage({ session }) {
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
           <div className="flex items-center gap-2">
             <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Overtime</p>
-            <span className="text-[10px] font-bold bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded-full">1.5×</span>
+            <span className="text-[10px] font-bold bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded-full">{otMultiplier}×</span>
           </div>
           {latest ? (
             <div className="space-y-3">
@@ -106,7 +103,7 @@ function EmployeePayPage({ session }) {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-400">Pay for 60+ hrs</span>
-                <span className="font-semibold text-primary">{fmt$(Number(pay.pay_rate) * 1.5)}/hr</span>
+                <span className="font-semibold text-primary">{fmt$(Number(pay.pay_rate) * otMultiplier)}/hr</span>
               </div>
               <div className="border-t border-gray-100 pt-3 flex justify-between text-sm">
                 <span className="font-semibold text-gray-500">Total</span>
@@ -126,8 +123,8 @@ function EmployeePayPage({ session }) {
           <div className="space-y-2.5">
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-500">Health</span>
-              <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${HEALTH_STYLES[benefits?.health_plan ?? "none"].bg} ${HEALTH_STYLES[benefits?.health_plan ?? "none"].text}`}>
-                {HEALTH_LABELS[benefits?.health_plan ?? "none"]}
+              <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${hStyle.bg} ${hStyle.text}`}>
+                {hLabel}
               </span>
             </div>
             <div className="flex items-center justify-between">
@@ -160,7 +157,6 @@ function EmployeePayPage({ session }) {
             <span className="text-xs text-gray-400">{fmtDate(latest.period_start)} – {fmtDate(latest.period_end)}</span>
           </div>
 
-          {/* Gross → Net */}
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs text-gray-400 uppercase tracking-wide">Gross Pay</p>
@@ -173,7 +169,6 @@ function EmployeePayPage({ session }) {
             </div>
           </div>
 
-          {/* Regular Hours */}
           {latest.hours_worked != null && (
             <div className="border-t border-gray-100 pt-4 space-y-2">
               <p className="text-xs font-semibold uppercase tracking-widest text-gray-300">Regular Hours</p>
@@ -184,8 +179,6 @@ function EmployeePayPage({ session }) {
             </div>
           )}
 
-
-          {/* Deductions */}
           <div className="border-t border-gray-100 pt-4 space-y-2">
             <p className="text-xs font-semibold uppercase tracking-widest text-gray-300 mb-3">Deductions</p>
             {deductions.map(d => (
@@ -234,7 +227,6 @@ function EmployeePayPage({ session }) {
 
                 {expanded === s.id && (
                   <div className="px-6 pb-5 space-y-2 bg-gray-50/50">
-                    {/* Earnings */}
                     {s.hours_worked && (
                       <>
                         <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-300 pt-2">Earnings</p>
@@ -246,7 +238,7 @@ function EmployeePayPage({ session }) {
                           <div className="flex justify-between text-sm">
                             <span className="flex items-center gap-1.5 text-amber-600">
                               Overtime ({s.overtime_hours}h)
-                              <span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-1 py-0.5 rounded-full">1.5×</span>
+                              <span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-1 py-0.5 rounded-full">OT</span>
                             </span>
                             <span className="font-semibold tabular-nums text-amber-600">{fmt$(s.overtime_pay)}</span>
                           </div>
@@ -257,7 +249,6 @@ function EmployeePayPage({ session }) {
                         </div>
                       </>
                     )}
-                    {/* Deductions */}
                     <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-300 pt-1">Deductions</p>
                     {[
                       { label: "Federal Tax",     value: `-${fmt$(s.federal_tax)}`         },
@@ -290,15 +281,18 @@ function EmployeePayPage({ session }) {
 function AdminPayPage() {
   const [employees, setEmployees]   = useState([]);
   const [deductions, setDeductions] = useState({});
+  const [settings, setSettings]     = useState({});
   const [loading, setLoading]       = useState(true);
   const [editing, setEditing]       = useState(null);
   const [form, setForm]             = useState({});
   const [deductForm, setDeductForm] = useState({});
 
   useEffect(() => {
-    fetch("/api/pay")
-      .then(r => r.json())
-      .then(async emps => {
+    Promise.all([
+      fetch("/api/pay").then(r => r.json()),
+      fetch("/api/settings").then(r => r.json()),
+    ]).then(async ([emps, cfg]) => {
+        setSettings(cfg);
         setEmployees(emps);
         const configs = await Promise.all(
           emps.map(e => fetch(`/api/deductions/${e.id}`).then(r => r.json()))
@@ -310,6 +304,8 @@ function AdminPayPage() {
       })
       .catch(() => setLoading(false));
   }, []);
+
+  const healthPlans = settings.health_plans ?? [{ value: "none", label: "No Coverage" }, { value: "basic", label: "Basic Plan" }, { value: "premium", label: "Premium Plan" }];
 
   function openEdit(emp) {
     setEditing(emp.id);
@@ -367,6 +363,8 @@ function AdminPayPage() {
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden divide-y divide-gray-50">
         {employees.map((emp) => {
           const isOpen = editing === emp.id;
+          const hPlan  = healthPlans.find(p => p.value === (emp.health_plan ?? "none"));
+          const hLabel = hPlan?.label ?? emp.health_plan ?? "None";
           return (
             <div key={emp.id} className="px-6 py-5">
               <div className="flex items-center gap-4">
@@ -381,7 +379,7 @@ function AdminPayPage() {
                   <p className="text-sm font-bold text-primary tabular-nums">
                     {emp.pay_rate ? (emp.pay_type === "hourly" ? `${fmt$(emp.pay_rate)}/hr` : fmt$(emp.pay_rate)) : "—"}
                   </p>
-                  <p className="text-xs text-gray-400">{HEALTH_LABELS[emp.health_plan ?? "none"]}</p>
+                  <p className="text-xs text-gray-400">{hLabel}</p>
                 </div>
                 {!isOpen && (
                   <button
@@ -424,9 +422,7 @@ function AdminPayPage() {
                     <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Health Plan</label>
                     <select value={form.health_plan} onChange={e => setForm(f => ({ ...f, health_plan: e.target.value }))}
                       className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-primary focus:outline-none focus:border-accent">
-                      <option value="none">No Coverage</option>
-                      <option value="basic">Basic Plan</option>
-                      <option value="premium">Premium Plan</option>
+                      {healthPlans.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
                     </select>
                   </div>
                   <div className="space-y-1">
@@ -448,7 +444,6 @@ function AdminPayPage() {
                       </label>
                     </div>
                   </div>
-                  {/* Deductions */}
                   <div className="col-span-2 space-y-3 border-t border-gray-100 pt-4">
                     <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Deductions</p>
                     <div className="grid grid-cols-3 gap-2">

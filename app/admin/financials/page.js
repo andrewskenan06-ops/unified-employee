@@ -135,11 +135,15 @@ export default function FinancialsDeepDivePage() {
   const [adding,   setAdding]   = useState(null);  // section key
   const [addForm,  setAddForm]  = useState({ label: "", amount: "", notes: "" });
   const [saving,   setSaving]   = useState(false);
+  const [taxRate,  setTaxRate]  = useState(0.21);
 
   useEffect(() => {
     fetch("/api/financials")
       .then(r => r.json())
       .then(d => { setEntries(Array.isArray(d) ? d : []); setLoading(false); });
+    fetch("/api/settings")
+      .then(r => r.json())
+      .then(s => { if (s.income_tax_rate) setTaxRate(Number(s.income_tax_rate)); });
   }, []);
 
   const bySection = useMemo(() => {
@@ -156,7 +160,6 @@ export default function FinancialsDeepDivePage() {
   const opex       = sum(bySection.operating_expenses ?? []);
   const grossProfit  = revenue - cogs;
   const ebit         = grossProfit - opex;
-  const taxRate      = 0.21;
   const tax          = Math.max(0, ebit * taxRate);
   const netIncome    = ebit - tax;
   const grossMargin  = revenue > 0 ? (grossProfit / revenue) * 100 : 0;

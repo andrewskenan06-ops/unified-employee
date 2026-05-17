@@ -5,13 +5,15 @@
 -- ── Users ────────────────────────────────────────────────────
 -- Replaces the hardcoded USERS array in lib/auth.js
 CREATE TABLE users (
-  id          TEXT        PRIMARY KEY,           -- e.g. "emp_1", "adm_1"
-  username    TEXT        NOT NULL UNIQUE,
-  password    TEXT        NOT NULL,              -- store hashed (bcrypt) in production
-  name        TEXT        NOT NULL,
-  role        TEXT        NOT NULL CHECK (role IN ('employee', 'admin')),
-  job_role    TEXT        CHECK (job_role IN ('Office Worker', 'Yard Worker', 'Truck Driver', 'Dirt Manager')),
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id                    TEXT        PRIMARY KEY,
+  username              TEXT        NOT NULL UNIQUE,
+  password              TEXT        NOT NULL,
+  name                  TEXT        NOT NULL,
+  role                  TEXT        NOT NULL CHECK (role IN ('employee', 'admin')),
+  job_role              TEXT        CHECK (job_role IN ('Office Worker', 'Yard Worker', 'Truck Driver', 'Dirt Manager')),
+  require_geofence      BOOLEAN     NOT NULL DEFAULT TRUE,
+  allow_mobile_anywhere BOOLEAN     NOT NULL DEFAULT FALSE,
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- ── Time Records ─────────────────────────────────────────────
@@ -57,3 +59,7 @@ INSERT INTO users (id, username, password, name, role, job_role) VALUES
   ('emp_8', 'riley',   'pass123',  'Riley Simmons',  'employee', 'Dirt Manager'),
   ('emp_9', 'drew',    'pass123',  'Drew Patel',     'employee', 'Yard Worker'),
   ('adm_1', 'admin',   'admin123', 'Admin',          'admin',    NULL);
+
+-- ── Migrations ───────────────────────────────────────────────
+ALTER TABLE users ADD COLUMN IF NOT EXISTS require_geofence      BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS allow_mobile_anywhere BOOLEAN NOT NULL DEFAULT FALSE;

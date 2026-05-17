@@ -1,22 +1,15 @@
 "use client";
-import { useState, useEffect } from "react";
-
-const JOB_ROLES = ["Yard Worker", "Office Worker", "Truck Driver", "Dirt Manager"];
-
-const ROLE_COLORS = {
-  "Yard Worker":    { bg: "bg-emerald-50",  text: "text-emerald-600",  dot: "bg-emerald-400" },
-  "Office Worker":  { bg: "bg-blue-50",     text: "text-blue-600",     dot: "bg-blue-400"    },
-  "Truck Driver":   { bg: "bg-orange-50",   text: "text-orange-600",   dot: "bg-orange-400"  },
-  "Dirt Manager":   { bg: "bg-amber-50",    text: "text-amber-700",    dot: "bg-amber-400"   },
-};
+import { useState, useEffect, useMemo } from "react";
+import { roleStyle } from "@/lib/constants";
 
 const EMPTY_FORM = {
-  name: "", job_role: "Yard Worker", pin: "",
+  name: "", job_role: "", pin: "",
   email: "", phone: "", start_date: "", employment_type: "full-time",
   emergency_name: "", emergency_phone: "",
   pay_type: "hourly", pay_rate: "",
   health_plan: "none", dental: false, vision: false, retirement_pct: 0,
   child_support: false, child_support_amount: 0,
+  require_geofence: true, allow_mobile_anywhere: false,
 };
 
 function initials(name) {
@@ -38,7 +31,7 @@ function Field({ label, children }) {
   );
 }
 
-function FormSection({ form, setForm }) {
+function FormSection({ form, setForm, jobRoles, employmentTypes, healthPlans }) {
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }));
   return (
     <div className="space-y-6">
@@ -53,14 +46,12 @@ function FormSection({ form, setForm }) {
           </Field>
           <Field label="Job Role">
             <select value={form.job_role} onChange={e => set("job_role", e.target.value)} className={INPUT}>
-              {JOB_ROLES.map(r => <option key={r}>{r}</option>)}
+              {(jobRoles ?? []).map(r => <option key={r.name} value={r.name}>{r.name}</option>)}
             </select>
           </Field>
           <Field label="Employment Type">
             <select value={form.employment_type} onChange={e => set("employment_type", e.target.value)} className={INPUT}>
-              <option value="full-time">Full-Time</option>
-              <option value="part-time">Part-Time</option>
-              <option value="contract">Contract</option>
+              {(employmentTypes ?? []).map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
             </select>
           </Field>
           <Field label="Start Date">
@@ -128,9 +119,7 @@ function FormSection({ form, setForm }) {
         <div className="grid grid-cols-3 gap-4">
           <Field label="Health Plan">
             <select value={form.health_plan} onChange={e => set("health_plan", e.target.value)} className={INPUT}>
-              <option value="none">No Coverage</option>
-              <option value="basic">Basic Plan</option>
-              <option value="premium">Premium Plan</option>
+              {(healthPlans ?? []).map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
             </select>
           </Field>
           <Field label="401(k) %">
@@ -165,8 +154,8 @@ function FormSection({ form, setForm }) {
   );
 }
 
-function EmployeeCard({ emp, onEdit, onToggleStatus, onDelete }) {
-  const roleStyle = ROLE_COLORS[emp.job_role] ?? { bg: "bg-gray-50", text: "text-gray-500", dot: "bg-gray-400" };
+function EmployeeCard({ emp, onEdit, onToggleStatus, onDelete, onToggleSetting, rolesMap }) {
+  const rs = roleStyle(rolesMap?.[emp.job_role]);
   const isInactive = emp.status === "inactive";
 
   return (
@@ -186,8 +175,8 @@ function EmployeeCard({ emp, onEdit, onToggleStatus, onDelete }) {
                 <span className="text-[9px] font-bold bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded-full uppercase tracking-wide">Inactive</span>
               )}
             </div>
-            <span className={`inline-flex items-center gap-1.5 mt-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ${roleStyle.bg} ${roleStyle.text}`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${roleStyle.dot}`} />
+            <span className={`inline-flex items-center gap-1.5 mt-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ${rs.bg} ${rs.text}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${rs.dot}`} />
               {emp.job_role ?? "No role"}
             </span>
           </div>
@@ -219,7 +208,22 @@ function EmployeeCard({ emp, onEdit, onToggleStatus, onDelete }) {
         </div>
       </div>
 
-      <div className="border-t border-gray-50 px-4 py-3 flex items-center gap-2">
+      <div className="border-t border-gray-50 px-4 py-3 space-y-2">
+        <div className="flex flex-col gap-1.5">
+          <label className="flex items-center gap-2 text-xs text-gray-500 cursor-pointer select-none">
+            <input type="checkbox" checked={emp.require_geofence ?? true}
+              onChange={e => onToggleSetting(emp.id, "require_geofence", e.target.checked)}
+              className="accent-accent w-3.5 h-3.5" />
+            Enforce geofence
+          </label>
+          <label className="flex items-center gap-2 text-xs text-gray-500 cursor-pointer select-none">
+            <input type="checkbox" checked={emp.allow_mobile_anywhere ?? false}
+              onChange={e => onToggleSetting(emp.id, "allow_mobile_anywhere", e.target.checked)}
+              className="accent-accent w-3.5 h-3.5" />
+            Mobile clock in
+          </label>
+        </div>
+        <div className="flex items-center gap-2">
         <button
           onClick={() => onToggleStatus(emp.id, emp.status ?? "active")}
           className={`flex-1 text-xs font-semibold py-1.5 rounded-lg border transition-colors ${
@@ -242,6 +246,7 @@ function EmployeeCard({ emp, onEdit, onToggleStatus, onDelete }) {
             <path d="M9,6V4a1,1,0,0,1,1-1h4a1,1,0,0,1,1,1v2"/>
           </svg>
         </button>
+        </div>
       </div>
     </div>
   );
@@ -256,18 +261,31 @@ export default function AdminEmployeesPage() {
   const [addForm, setAddForm]     = useState(EMPTY_FORM);
   const [saving, setSaving]       = useState(false);
   const [error, setError]         = useState("");
+  const [jobRoles,  setJobRoles]  = useState([]);
+  const [settings,  setSettings]  = useState({});
+
+  const rolesMap        = useMemo(() => Object.fromEntries(jobRoles.map(r => [r.name, r.color])), [jobRoles]);
+  const employmentTypes = settings.employment_types ?? [{ value: "full-time", label: "Full-Time" }, { value: "part-time", label: "Part-Time" }, { value: "contract", label: "Contract" }];
+  const healthPlans     = settings.health_plans     ?? [{ value: "none", label: "No Coverage" }, { value: "basic", label: "Basic Plan" }, { value: "premium", label: "Premium Plan" }];
 
   useEffect(() => {
-    fetch("/api/employees")
-      .then(r => r.json())
-      .then(d => { setEmployees(d); setLoading(false); });
+    Promise.all([
+      fetch("/api/employees").then(r => r.json()),
+      fetch("/api/job-roles").then(r => r.json()),
+      fetch("/api/settings").then(r => r.json()),
+    ]).then(([emps, roles, cfg]) => {
+      setEmployees(emps);
+      setJobRoles(roles);
+      setSettings(cfg);
+      setLoading(false);
+    });
   }, []);
 
   function openEdit(emp) {
     setEditing(emp.id);
     setEditForm({
       name:                 emp.name,
-      job_role:             emp.job_role             ?? "Yard Worker",
+      job_role:             emp.job_role             ?? jobRoles[0]?.name ?? "",
       pin:                  emp.pin                  ?? "",
       email:                emp.email                ?? "",
       phone:                emp.phone                ?? "",
@@ -283,6 +301,8 @@ export default function AdminEmployeesPage() {
       retirement_pct:       emp.retirement_pct       ?? 0,
       child_support:        emp.child_support        ?? false,
       child_support_amount: emp.child_support_amount ?? 0,
+      require_geofence:     emp.require_geofence     ?? true,
+      allow_mobile_anywhere: emp.allow_mobile_anywhere ?? false,
     });
     setAdding(false);
     setError("");
@@ -304,6 +324,8 @@ export default function AdminEmployeesPage() {
           employment_type: editForm.employment_type,
           emergency_name: editForm.emergency_name,
           emergency_phone: editForm.emergency_phone,
+          require_geofence: editForm.require_geofence,
+          allow_mobile_anywhere: editForm.allow_mobile_anywhere,
         }),
       }),
       fetch(`/api/pay/${id}`, {
@@ -338,6 +360,23 @@ export default function AdminEmployeesPage() {
       body: JSON.stringify({ status: next }),
     });
     setEmployees(emps => emps.map(e => e.id === id ? { ...e, status: next } : e));
+  }
+
+  async function toggleSetting(id, field, value) {
+    setEmployees(emps => emps.map(e => e.id === id ? { ...e, [field]: value } : e));
+    const emp = employees.find(e => e.id === id);
+    await fetch(`/api/employees/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: emp.name, job_role: emp.job_role, pin: emp.pin,
+        email: emp.email ?? null, phone: emp.phone ?? null,
+        start_date: emp.start_date ?? null, employment_type: emp.employment_type ?? "full-time",
+        emergency_name: emp.emergency_name ?? null, emergency_phone: emp.emergency_phone ?? null,
+        require_geofence:     field === "require_geofence"     ? value : (emp.require_geofence     ?? true),
+        allow_mobile_anywhere: field === "allow_mobile_anywhere" ? value : (emp.allow_mobile_anywhere ?? false),
+      }),
+    });
   }
 
   async function deleteEmployee(id, name) {
@@ -409,6 +448,8 @@ export default function AdminEmployeesPage() {
             onEdit={openEdit}
             onToggleStatus={toggleStatus}
             onDelete={deleteEmployee}
+            onToggleSetting={toggleSetting}
+            rolesMap={rolesMap}
           />
         ))}
       </div>
@@ -443,7 +484,7 @@ export default function AdminEmployeesPage() {
                   {error}
                 </div>
               )}
-              <FormSection form={addForm} setForm={setAddForm} />
+              <FormSection form={addForm} setForm={setAddForm} jobRoles={jobRoles} employmentTypes={employmentTypes} healthPlans={healthPlans} />
             </div>
             <div className="px-6 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0 bg-gray-50/50">
               <button onClick={addEmployee} disabled={saving}
@@ -490,7 +531,7 @@ export default function AdminEmployeesPage() {
                   {error}
                 </div>
               )}
-              <FormSection form={editForm} setForm={setEditForm} />
+              <FormSection form={editForm} setForm={setEditForm} jobRoles={jobRoles} employmentTypes={employmentTypes} healthPlans={healthPlans} />
             </div>
             <div className="px-6 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0 bg-gray-50/50">
               <button onClick={() => saveEdit(editing)} disabled={saving}

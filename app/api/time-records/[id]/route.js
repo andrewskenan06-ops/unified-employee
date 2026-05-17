@@ -1,12 +1,16 @@
 import sql from "@/lib/db";
+import { getTenantId } from "@/lib/tenant";
 
 export async function PATCH(request, { params }) {
   try {
+    const tenantId = getTenantId(request);
+    if (!tenantId) return Response.json({ error: "Tenant required" }, { status: 400 });
+
     const { id } = await params;
     const body = await request.json();
 
     if ("approved" in body) {
-      await sql`UPDATE time_records SET approved = ${body.approved} WHERE id = ${id}`;
+      await sql`UPDATE time_records SET approved = ${body.approved} WHERE id = ${id} AND tenant_id = ${tenantId}`;
       return Response.json({ ok: true });
     }
 
@@ -18,7 +22,7 @@ export async function PATCH(request, { params }) {
         clock_out_lng      = ${clockOut.lng},
         clock_out_dist_ft  = ${clockOut.distanceFt},
         flagged            = flagged OR ${clockOut.flagged}
-      WHERE id = ${id}`;
+      WHERE id = ${id} AND tenant_id = ${tenantId}`;
 
     return Response.json({ ok: true });
   } catch (e) {

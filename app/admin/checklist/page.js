@@ -1,12 +1,12 @@
 "use client";
 import { useState, useEffect } from "react";
 
-const JOB_ROLES  = ["Yard Worker", "Office Worker", "Truck Driver", "Dirt Manager"];
 const DIRECTIONS = ["in", "out"];
 const EMPTY_Q    = { message: "", type: "confirm", button_text: "Yes", video_url: "" };
 
 export default function AdminChecklistPage() {
   const [questions, setQuestions] = useState([]);
+  const [jobRoles,  setJobRoles]  = useState([]);
   const [loading, setLoading]     = useState(true);
   const [editing, setEditing]     = useState(null);
   const [editForm, setEditForm]   = useState({});
@@ -15,9 +15,14 @@ export default function AdminChecklistPage() {
   const [saving, setSaving]       = useState(false);
 
   useEffect(() => {
-    fetch("/api/checklist")
-      .then(r => r.json())
-      .then(d => { setQuestions(d); setLoading(false); });
+    Promise.all([
+      fetch("/api/checklist").then(r => r.json()),
+      fetch("/api/job-roles").then(r => r.json()),
+    ]).then(([qs, roles]) => {
+      setQuestions(qs);
+      setJobRoles(roles.map(r => r.name));
+      setLoading(false);
+    });
   }, []);
 
   function questionsFor(role, dir) {
@@ -71,7 +76,7 @@ export default function AdminChecklistPage() {
         <p className="text-sm text-gray-400 mt-0.5">Manage questions shown to employees when clocking in and out</p>
       </div>
 
-      {JOB_ROLES.map(role => (
+      {jobRoles.map(role => (
         <div key={role} className="space-y-4">
           <h2 className="text-sm font-bold text-primary border-b border-gray-100 pb-2">{role}</h2>
 

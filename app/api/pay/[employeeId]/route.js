@@ -1,13 +1,17 @@
 import sql from "@/lib/db";
+import { getTenantId } from "@/lib/tenant";
 
 export async function GET(request, { params }) {
   try {
+    const tenantId = getTenantId(request);
+    if (!tenantId) return Response.json({ error: "Tenant required" }, { status: 400 });
+
     const { employeeId } = await params;
 
     const [payRows, benefitRows, stubRows] = await Promise.all([
-      sql`SELECT * FROM employee_pay WHERE employee_id = ${employeeId}`,
-      sql`SELECT * FROM employee_benefits WHERE employee_id = ${employeeId}`,
-      sql`SELECT * FROM pay_stubs WHERE employee_id = ${employeeId} ORDER BY period_end DESC`,
+      sql`SELECT * FROM employee_pay WHERE employee_id = ${employeeId} AND tenant_id = ${tenantId}`,
+      sql`SELECT * FROM employee_benefits WHERE employee_id = ${employeeId} AND tenant_id = ${tenantId}`,
+      sql`SELECT * FROM pay_stubs WHERE employee_id = ${employeeId} AND tenant_id = ${tenantId} ORDER BY period_end DESC`,
     ]);
 
     return Response.json({
@@ -22,14 +26,17 @@ export async function GET(request, { params }) {
 
 export async function PATCH(request, { params }) {
   try {
+    const tenantId = getTenantId(request);
+    if (!tenantId) return Response.json({ error: "Tenant required" }, { status: 400 });
+
     const { employeeId } = await params;
     const body = await request.json();
 
     if (body.pay) {
       const { pay_type, pay_rate, pay_period } = body.pay;
       await sql`
-        INSERT INTO employee_pay (employee_id, pay_type, pay_rate, pay_period)
-        VALUES (${employeeId}, ${pay_type}, ${pay_rate}, ${pay_period})
+        INSERT INTO employee_pay (tenant_id, employee_id, pay_type, pay_rate, pay_period)
+        VALUES (${tenantId}, ${employeeId}, ${pay_type}, ${pay_rate}, ${pay_period})
         ON CONFLICT (employee_id) DO UPDATE SET
           pay_type   = EXCLUDED.pay_type,
           pay_rate   = EXCLUDED.pay_rate,
@@ -40,8 +47,8 @@ export async function PATCH(request, { params }) {
     if (body.benefits) {
       const { health_plan, dental, vision, retirement_pct } = body.benefits;
       await sql`
-        INSERT INTO employee_benefits (employee_id, health_plan, dental, vision, retirement_pct)
-        VALUES (${employeeId}, ${health_plan}, ${dental}, ${vision}, ${retirement_pct})
+        INSERT INTO employee_benefits (tenant_id, employee_id, health_plan, dental, vision, retirement_pct)
+        VALUES (${tenantId}, ${employeeId}, ${health_plan}, ${dental}, ${vision}, ${retirement_pct})
         ON CONFLICT (employee_id) DO UPDATE SET
           health_plan    = EXCLUDED.health_plan,
           dental         = EXCLUDED.dental,

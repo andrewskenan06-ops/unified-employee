@@ -1,20 +1,10 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { getSession } from "@/lib/auth";
+import { roleStyle } from "@/lib/constants";
 
 const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DAY_NAMES   = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
-
-const WORK_DAYS = [1,2,3,4,5,6]; // Mon–Sat
-
-const DAY_HOURS = { 1:"6:30–4:30", 2:"6:30–4:30", 3:"6:30–4:30", 4:"6:30–4:30", 5:"6:30–4:30", 6:"8–11 AM" };
-
-const ROLE_COLORS = {
-  "Yard Worker":   { bg:"bg-emerald-50", text:"text-emerald-600", dot:"bg-emerald-400" },
-  "Office Worker": { bg:"bg-blue-50",    text:"text-blue-600",    dot:"bg-blue-400"    },
-  "Truck Driver":  { bg:"bg-orange-50",  text:"text-orange-600",  dot:"bg-orange-400"  },
-  "Dirt Manager":  { bg:"bg-amber-50",   text:"text-amber-700",   dot:"bg-amber-400"   },
-};
 
 function initials(name) {
   return name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
@@ -55,10 +45,15 @@ export default function AdminSchedulePage() {
   const [schedule,   setSchedule]   = useState({});
   const [employees,  setEmployees]  = useState([]);
   const [weekStart,  setWeekStart]  = useState(() => getMondayOf(today));
-  const [adding,     setAdding]     = useState(null); // dateKey being added to
+  const [adding,     setAdding]     = useState(null);
   const [miniMonth,  setMiniMonth]  = useState(today.getMonth());
   const [miniYear]                   = useState(today.getFullYear());
+  const [jobRoles,   setJobRoles]   = useState([]);
+  const [workDays,   setWorkDays]   = useState([1,2,3,4,5,6]);
+  const [dayHours,   setDayHours]   = useState({ 1:"6:30–4:30", 2:"6:30–4:30", 3:"6:30–4:30", 4:"6:30–4:30", 5:"6:30–4:30", 6:"8–11 AM" });
   const addRef = useRef(null);
+
+  const rolesMap = useMemo(() => Object.fromEntries(jobRoles.map(r => [r.name, r.color])), [jobRoles]);
 
   useEffect(() => {
     const s = getSession();
@@ -66,13 +61,17 @@ export default function AdminSchedulePage() {
     Promise.all([
       fetch("/api/schedule").then(r => r.json()),
       fetch("/api/employees").then(r => r.json()),
-    ]).then(([sched, emps]) => {
+      fetch("/api/job-roles").then(r => r.json()),
+      fetch("/api/settings").then(r => r.json()),
+    ]).then(([sched, emps, roles, cfg]) => {
       setSchedule(sched);
       setEmployees(emps.filter(e => e.status !== "inactive"));
+      setJobRoles(roles);
+      if (cfg.work_days)  setWorkDays(cfg.work_days);
+      if (cfg.day_hours)  setDayHours(cfg.day_hours);
     }).catch(() => {});
   }, []);
 
-  // Close add dropdown when clicking outside
   useEffect(() => {
     function onClickOutside(e) {
       if (addRef.current && !addRef.current.contains(e.target)) setAdding(null);
@@ -105,20 +104,18 @@ export default function AdminSchedulePage() {
     }));
   }
 
-  // Work days for this week (Mon–Sat)
-  const weekDays = WORK_DAYS.map(offset => addDays(weekStart, offset - 1));
+  const weekDays = workDays.map(offset => addDays(weekStart, offset - 1));
 
-  // Format week label
   const weekLabel = (() => {
     const s = weekDays[0];
-    const e = weekDays[5];
+    const e = weekDays[weekDays.length - 1];
     if (s.getMonth() === e.getMonth())
       return `${MONTH_NAMES[s.getMonth()]} ${s.getDate()}–${e.getDate()}, ${s.getFullYear()}`;
     return `${MONTH_NAMES[s.getMonth()]} ${s.getDate()} – ${MONTH_NAMES[e.getMonth()]} ${e.getDate()}, ${e.getFullYear()}`;
   })();
 
-  // Mini calendar
   const miniCells = buildMiniCalendar(miniYear, miniMonth);
+  const colStyle  = { gridTemplateColumns: `repeat(${weekDays.length}, minmax(0, 1fr))` };
 
   return (
     <div className="flex gap-5 h-full px-6 py-5 overflow-hidden">
@@ -152,7 +149,7 @@ export default function AdminSchedulePage() {
         <div className="flex-1 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
 
           {/* Day headers */}
-          <div className="grid grid-cols-6 border-b border-gray-100 flex-shrink-0">
+          <div className="grid border-b border-gray-100 flex-shrink-0" style={colStyle}>
             {weekDays.map(date => {
               const isToday = toDateKey(date) === toDateKey(today);
               const dow     = date.getDay();
@@ -163,14 +160,14 @@ export default function AdminSchedulePage() {
                     {DAY_NAMES[dow]}
                   </p>
                   <p className={`text-sm font-black mt-0.5 ${isToday ? "text-accent" : "text-primary"}`}>{date.getDate()}</p>
-                  <p className={`text-[8px] font-semibold mt-0.5 ${isSat ? "text-accent/60" : "text-gray-300"}`}>{DAY_HOURS[dow]}</p>
+                  <p className={`text-[8px] font-semibold mt-0.5 ${isSat ? "text-accent/60" : "text-gray-300"}`}>{dayHours[String(dow)]}</p>
                 </div>
               );
             })}
           </div>
 
           {/* Employee rows */}
-          <div className="flex-1 grid grid-cols-6 overflow-y-auto">
+          <div className="flex-1 grid overflow-y-auto" style={colStyle}>
             {weekDays.map(date => {
               const dateKey  = toDateKey(date);
               const workers  = schedule[dateKey] || [];
@@ -186,7 +183,7 @@ export default function AdminSchedulePage() {
 
                   {/* Worker chips */}
                   {workers.map(w => {
-                    const rs = ROLE_COLORS[w.job_role] ?? { bg:"bg-gray-100", text:"text-gray-500", dot:"bg-gray-300" };
+                    const rs = roleStyle(rolesMap[w.job_role]);
                     return (
                       <div key={w.slotId ?? w.id}
                         className={`group flex items-center gap-1 px-1.5 py-1 rounded-md ${rs.bg} relative`}>
@@ -221,7 +218,7 @@ export default function AdminSchedulePage() {
                           </div>
                           <div className="max-h-52 overflow-y-auto divide-y divide-gray-50">
                             {available.map(emp => {
-                              const rs = ROLE_COLORS[emp.job_role] ?? { bg:"bg-gray-50", text:"text-gray-500", dot:"bg-gray-300" };
+                              const rs = roleStyle(rolesMap[emp.job_role]);
                               return (
                                 <button key={emp.id} onClick={() => addWorker(dateKey, emp)}
                                   className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-gray-50 transition-colors text-left">

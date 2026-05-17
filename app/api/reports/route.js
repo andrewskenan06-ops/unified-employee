@@ -1,15 +1,17 @@
 import sql from "@/lib/db";
+import { getTenantId } from "@/lib/tenant";
 
-// GET /api/reports?category=financials  → all metrics for a category
-// GET /api/reports                      → all metrics grouped by category
 export async function GET(request) {
   try {
+    const tenantId = getTenantId(request);
+    if (!tenantId) return Response.json({ error: "Tenant required" }, { status: 400 });
+
     const { searchParams } = new URL(request.url);
     const category = searchParams.get("category");
 
     const rows = category
-      ? await sql`SELECT * FROM report_metrics WHERE category = ${category} ORDER BY id`
-      : await sql`SELECT * FROM report_metrics ORDER BY category, id`;
+      ? await sql`SELECT * FROM report_metrics WHERE tenant_id = ${tenantId} AND category = ${category} ORDER BY id`
+      : await sql`SELECT * FROM report_metrics WHERE tenant_id = ${tenantId} ORDER BY category, id`;
 
     return Response.json(rows);
   } catch (e) {
@@ -17,9 +19,11 @@ export async function GET(request) {
   }
 }
 
-// POST /api/reports  { key, value, change_pct, change_label }  → upsert a metric value
 export async function POST(request) {
   try {
+    const tenantId = getTenantId(request);
+    if (!tenantId) return Response.json({ error: "Tenant required" }, { status: 400 });
+
     const { key, value, change_pct, change_label } = await request.json();
     const rows = await sql`
       UPDATE report_metrics
@@ -27,7 +31,7 @@ export async function POST(request) {
           change_pct   = ${change_pct   ?? null},
           change_label = ${change_label ?? null},
           updated_at   = NOW()
-      WHERE metric_key = ${key}
+      WHERE metric_key = ${key} AND tenant_id = ${tenantId}
       RETURNING *`;
     if (!rows.length) return Response.json({ error: "Metric key not found" }, { status: 404 });
     return Response.json(rows[0]);

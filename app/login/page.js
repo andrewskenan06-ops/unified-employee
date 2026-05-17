@@ -166,49 +166,16 @@ function PinPage() {
   const executeClock = useCallback(async (resolvedUser, dir, recordId) => {
     setStage("locating");
 
-    if (resolvedUser.allowMobileAnywhere) {
-      const time  = new Date().toISOString();
-      const punch = { time, lat: null, lng: null, distanceFt: null, flagged: false };
-      if (dir === "in") {
-        await fetch("/api/time-records", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ employeeId: resolvedUser.id, clockIn: punch }) });
-      } else {
-        await fetch(`/api/time-records/${recordId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clockOut: punch }) });
-      }
-      setResult({ flagged: false, distanceFt: null, time, dir });
-      setStage("success");
-      return;
+    const time  = new Date().toISOString();
+    const punch = { time, lat: null, lng: null, distanceFt: null, flagged: false };
+    if (dir === "in") {
+      await fetch("/api/time-records", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ employeeId: resolvedUser.id, clockIn: punch }) });
+    } else {
+      await fetch(`/api/time-records/${recordId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clockOut: punch }) });
     }
-
-    try {
-      const pos = await new Promise((res, rej) =>
-        navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true, timeout: 10000 })
-      );
-      const { latitude: lat, longitude: lng } = pos.coords;
-      const distanceFt = Math.round(haversineDistanceFt(lat, lng, cfg.geofence_lat, cfg.geofence_lng));
-      const flagged    = resolvedUser.requireGeofence === false ? false : distanceFt > cfg.geofence_radius_ft;
-      const time       = new Date().toISOString();
-      const punch      = { time, lat, lng, distanceFt, flagged };
-
-      if (dir === "in") {
-        await fetch("/api/time-records", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ employeeId: resolvedUser.id, clockIn: punch }),
-        });
-      } else {
-        await fetch(`/api/time-records/${recordId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ clockOut: punch }),
-        });
-      }
-
-      setResult({ flagged, distanceFt, time, dir });
-    } catch {
-      setResult({ error: true, dir });
-    }
+    setResult({ flagged: false, distanceFt: null, time, dir });
     setStage("success");
-  }, [cfg]);
+  }, []);
 
   const submitPin = useCallback(async (pin) => {
     const res  = await fetch("/api/auth/pin", {

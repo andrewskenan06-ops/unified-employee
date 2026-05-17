@@ -3,8 +3,13 @@ import { getTenantId } from "@/lib/tenant";
 
 export async function POST(request) {
   try {
-    const tenantId = getTenantId(request);
-    if (!tenantId) return Response.json({ error: "Tenant required" }, { status: 400 });
+    let tenantId = getTenantId(request);
+    if (!tenantId) {
+      // Fall back to the demo tenant for single-tenant / unbranded kiosk access
+      const demo = await sql`SELECT id FROM tenants WHERE slug = 'demo' LIMIT 1`;
+      if (demo.length === 0) return Response.json({ error: "Tenant required" }, { status: 400 });
+      tenantId = demo[0].id;
+    }
 
     const { pin } = await request.json();
     if (!pin) return Response.json({ error: "PIN required" }, { status: 400 });

@@ -7,7 +7,7 @@
 CREATE TABLE IF NOT EXISTS workforce_employees (
   id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id           UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  user_id             UUID REFERENCES users(id) ON DELETE SET NULL,
+  user_id             TEXT REFERENCES users(id) ON DELETE SET NULL,
   employee_number     TEXT,
   first_name          TEXT NOT NULL,
   last_name           TEXT NOT NULL,
@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS workforce_time_entries (
   dispute_resolved_at TIMESTAMPTZ,
   dispute_resolution  TEXT,
   dispute_notes       TEXT,
-  resolved_by         UUID REFERENCES users(id) ON DELETE SET NULL,
+  resolved_by         TEXT REFERENCES users(id) ON DELETE SET NULL,
   created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (employee_id, entry_date)
@@ -105,7 +105,7 @@ CREATE TABLE IF NOT EXISTS workforce_schedules (
   notes           TEXT,
   published       BOOLEAN NOT NULL DEFAULT false,
   confirmed_at    TIMESTAMPTZ,
-  created_by      UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_by      TEXT REFERENCES users(id) ON DELETE SET NULL,
   template_id     UUID,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -122,7 +122,7 @@ CREATE TABLE IF NOT EXISTS workforce_schedule_templates (
   tenant_id     UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   department_id UUID,
   name          TEXT NOT NULL,
-  created_by    UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_by    TEXT REFERENCES users(id) ON DELETE SET NULL,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -137,7 +137,7 @@ CREATE TABLE IF NOT EXISTS workforce_time_off_requests (
   hours_requested NUMERIC(6,2),
   notes           TEXT,
   status          TEXT NOT NULL DEFAULT 'pending',  -- pending | approved | denied | cancelled
-  reviewed_by     UUID REFERENCES users(id) ON DELETE SET NULL,
+  reviewed_by     TEXT REFERENCES users(id) ON DELETE SET NULL,
   reviewed_at     TIMESTAMPTZ,
   reviewer_notes  TEXT,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -200,7 +200,7 @@ CREATE TABLE IF NOT EXISTS workforce_briefings (
   status                TEXT NOT NULL DEFAULT 'draft',   -- draft | published | archived
   published_at          TIMESTAMPTZ,
   expires_at            TIMESTAMPTZ,
-  created_by            UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_by            TEXT REFERENCES users(id) ON DELETE SET NULL,
   created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at            TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -228,7 +228,7 @@ CREATE TABLE IF NOT EXISTS workforce_personal_tasks (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id     UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   assigned_to   UUID NOT NULL REFERENCES workforce_employees(id) ON DELETE CASCADE,
-  assigned_by   UUID REFERENCES users(id) ON DELETE SET NULL,
+  assigned_by   TEXT REFERENCES users(id) ON DELETE SET NULL,
   title         TEXT NOT NULL,
   description   TEXT,
   due_date      DATE,
@@ -250,7 +250,7 @@ CREATE TABLE IF NOT EXISTS workforce_payroll_runs (
   pay_date     DATE NOT NULL,
   status       TEXT NOT NULL DEFAULT 'draft',   -- draft | approved | paid | cancelled
   notes        TEXT,
-  created_by   UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_by   TEXT REFERENCES users(id) ON DELETE SET NULL,
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -302,7 +302,7 @@ CREATE TABLE IF NOT EXISTS workforce_cases (
   visible_to_employee     BOOLEAN NOT NULL DEFAULT false,
   status                  TEXT NOT NULL DEFAULT 'open',         -- open | resolved | closed
   resolved_at             TIMESTAMPTZ,
-  resolved_by             UUID REFERENCES users(id) ON DELETE SET NULL,
+  resolved_by             TEXT REFERENCES users(id) ON DELETE SET NULL,
   resolution_notes        TEXT,
   created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at              TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -394,15 +394,14 @@ CREATE TABLE IF NOT EXISTS workforce_devices (
   role        TEXT NOT NULL DEFAULT 'clock_terminal',
   is_active   BOOLEAN NOT NULL DEFAULT true,
   last_seen   TIMESTAMPTZ,
-  registered_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  registered_by TEXT REFERENCES users(id) ON DELETE SET NULL,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (tenant_id, uuid)
 );
 
 -- ── tenant branding extras (extend existing tenants row) ─────
-ALTER TABLE tenants
-  ADD COLUMN IF NOT EXISTS logo_url       TEXT,
-  ADD COLUMN IF NOT EXISTS primary_color  TEXT,
-  ADD COLUMN IF NOT EXISTS mission        TEXT,
-  ADD COLUMN IF NOT EXISTS timezone       TEXT NOT NULL DEFAULT 'America/New_York';
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS logo_url      TEXT;
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS primary_color TEXT;
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS mission       TEXT;
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS timezone      TEXT DEFAULT 'America/New_York';

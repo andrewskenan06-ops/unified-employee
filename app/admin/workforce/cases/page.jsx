@@ -80,20 +80,20 @@ export default function WorkforceCasesPage() {
         ))}
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-gray-100">
-              <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Employee</th>
-              <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Type</th>
-              <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Category</th>
-              <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Title</th>
-              <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Severity</th>
-              <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
-              <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Created</th>
+            <tr className="bg-gray-50 border-b border-gray-200">
+              <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Employee</th>
+              <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Type</th>
+              <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Category</th>
+              <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Title</th>
+              <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Severity</th>
+              <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Status</th>
+              <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Created</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-50">
+          <tbody className="divide-y divide-gray-100">
             {filtered.length === 0 ? (
               <tr><td colSpan={7} className="px-5 py-10 text-center text-gray-400 text-sm">No cases found.</td></tr>
             ) : filtered.map(c => (
@@ -116,7 +116,7 @@ export default function WorkforceCasesPage() {
                   <tr key={`${c.id}-expand`}>
                     <td colSpan={7} className="px-5 py-0">
                       <div className="bg-gray-50 rounded-xl mx-0 my-2 px-5 py-4 border border-gray-100">
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Description</p>
+                        <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">Description</p>
                         <p className="text-sm text-gray-600">{c.description ?? c.notes ?? "No description provided."}</p>
                       </div>
                     </td>

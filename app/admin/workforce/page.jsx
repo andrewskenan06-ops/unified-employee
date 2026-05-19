@@ -136,13 +136,15 @@ export default function WorkforceOverviewPage() {
       {/* Stat cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {statCards.map(card => (
-          <div key={card.label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-            <div className="flex items-start justify-between mb-3">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-tight">{card.label}</p>
+          <div key={card.label} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest leading-tight">{card.label}</p>
               {card.icon}
             </div>
-            <p className={`text-3xl font-black ${card.color}`}>{card.value}</p>
-            <p className="text-xs text-gray-400 mt-1">{card.sub}</p>
+            <div className="border-t border-gray-100 pt-3">
+              <p className={`text-3xl font-black ${card.color}`}>{card.value}</p>
+              <p className="text-xs text-gray-400 mt-1">{card.sub}</p>
+            </div>
           </div>
         ))}
       </div>
@@ -153,7 +155,7 @@ export default function WorkforceOverviewPage() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {quickLinks.map(ql => (
             <Link key={ql.href} href={ql.href}
-              className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:border-accent/30 hover:shadow-md transition-all group">
+              className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 hover:border-accent/40 hover:shadow-md transition-all group">
               <div className="w-10 h-10 rounded-xl bg-accent/10 text-accent flex items-center justify-center mb-3 group-hover:bg-accent/20 transition-colors">
                 {ql.icon}
               </div>

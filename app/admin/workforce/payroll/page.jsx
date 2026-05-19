@@ -13,7 +13,7 @@ const EMPTY_FORM = {
 function Field({ label, children }) {
   return (
     <div className="space-y-1.5">
-      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block">{label}</label>
+      <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest block">{label}</label>
       {children}
     </div>
   );
@@ -103,18 +103,18 @@ export default function WorkforcePayrollPage() {
         </button>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-gray-100">
-              <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Period</th>
-              <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Pay Date</th>
-              <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
-              <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Entries</th>
-              <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Actions</th>
+            <tr className="bg-gray-50 border-b border-gray-200">
+              <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Period</th>
+              <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Pay Date</th>
+              <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Status</th>
+              <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Entries</th>
+              <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-50">
+          <tbody className="divide-y divide-gray-100">
             {runs.length === 0 ? (
               <tr><td colSpan={5} className="px-5 py-10 text-center text-gray-400 text-sm">No payroll runs found.</td></tr>
             ) : runs.map(run => (
@@ -150,12 +150,12 @@ export default function WorkforcePayrollPage() {
                         ) : (
                           <table className="w-full">
                             <thead>
-                              <tr className="border-b border-gray-100">
-                                <th className="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Employee</th>
-                                <th className="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Regular Hrs</th>
-                                <th className="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">OT Hrs</th>
-                                <th className="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Gross Pay</th>
-                                <th className="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Net Pay</th>
+                              <tr className="bg-gray-50 border-b border-gray-200">
+                                <th className="px-4 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Employee</th>
+                                <th className="px-4 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Regular Hrs</th>
+                                <th className="px-4 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">OT Hrs</th>
+                                <th className="px-4 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Gross Pay</th>
+                                <th className="px-4 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Net Pay</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">

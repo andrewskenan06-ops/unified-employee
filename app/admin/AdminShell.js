@@ -1,10 +1,10 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { getSession, logout } from "@/lib/auth";
 
-const NAV_GROUPS = [
+const DEFAULT_NAV_GROUPS = [
   {
     label: "Workforce Module",
     items: [
@@ -218,23 +218,69 @@ const NAV_GROUPS = [
   },
 ];
 
-function NavGroup({ group, pathname, openSidebar }) {
+function loadSavedOrder() {
+  if (typeof window === "undefined") return null;
+  try { return JSON.parse(localStorage.getItem("admin_nav_order")); }
+  catch { return null; }
+}
+
+function applyOrder(defaults, saved) {
+  if (!saved) return defaults;
+  const groupMap = Object.fromEntries(defaults.map(g => [g.label, g]));
+  const ordered = (saved.groupOrder || []).map(l => groupMap[l]).filter(Boolean);
+  defaults.forEach(g => { if (!saved.groupOrder?.includes(g.label)) ordered.push(g); });
+  return ordered.map(g => {
+    const itemOrder = saved.itemOrders?.[g.label];
+    if (!itemOrder) return g;
+    const itemMap = Object.fromEntries(g.items.map(i => [i.href, i]));
+    const orderedItems = itemOrder.map(h => itemMap[h]).filter(Boolean);
+    g.items.forEach(i => { if (!itemOrder.includes(i.href)) orderedItems.push(i); });
+    return { ...g, items: orderedItems };
+  });
+}
+
+function persistOrder(groups) {
+  localStorage.setItem("admin_nav_order", JSON.stringify({
+    groupOrder: groups.map(g => g.label),
+    itemOrders: Object.fromEntries(groups.map(g => [g.label, g.items.map(i => i.href)])),
+  }));
+}
+
+const GripIcon = () => (
+  <svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor" className="opacity-0 group-hover:opacity-40 hover:!opacity-70 transition-opacity flex-shrink-0 cursor-grab active:cursor-grabbing">
+    <circle cx="3" cy="2.5" r="1.2"/><circle cx="7" cy="2.5" r="1.2"/>
+    <circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/>
+    <circle cx="3" cy="11.5" r="1.2"/><circle cx="7" cy="11.5" r="1.2"/>
+  </svg>
+);
+
+function NavGroup({ group, groupIndex, pathname, openSidebar, onGroupDragStart, onGroupDragOver, onGroupDrop, onGroupDragEnd, onItemDragStart, onItemDragOver, onItemDrop, onItemDragEnd, dragState }) {
   const hasActive = group.items.some(i => i.href === pathname);
   const [expanded, setExpanded] = useState(hasActive);
 
   if (!openSidebar) return null;
 
+  const isGroupDragOver = dragState.current?.type === "group" && dragState.current?.overIndex === groupIndex && dragState.current?.fromIndex !== groupIndex;
+
   return (
-    <div>
+    <div
+      draggable
+      onDragStart={e => onGroupDragStart(e, groupIndex)}
+      onDragOver={e => onGroupDragOver(e, groupIndex)}
+      onDrop={e => onGroupDrop(e, groupIndex)}
+      onDragEnd={onGroupDragEnd}
+      className={`rounded-lg transition-all ${isGroupDragOver ? "ring-1 ring-accent/50 bg-white/5" : ""}`}
+    >
       <button
         onClick={() => setExpanded(e => !e)}
-        className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-white/30 hover:text-white/50 transition-colors"
+        className="group w-full flex items-center gap-1.5 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-white/30 hover:text-white/50 transition-colors"
       >
-        <span>{group.label}</span>
+        <GripIcon />
+        <span className="flex-1 text-left">{group.label}</span>
         <svg
           width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5"
           strokeLinecap="round" strokeLinejoin="round"
-          className={`transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
+          className={`transition-transform duration-200 flex-shrink-0 ${expanded ? "rotate-180" : ""}`}
         >
           <polyline points="2,4 6,8 10,4"/>
         </svg>
@@ -242,28 +288,58 @@ function NavGroup({ group, pathname, openSidebar }) {
 
       {expanded && (
         <div className="space-y-0.5 mb-1">
-          {group.items.map(({ href, label, icon, external }) => {
+          {group.items.map(({ href, label, icon, external }, itemIndex) => {
             const active = pathname === href;
+            const isItemDragOver =
+              dragState.current?.type === "item" &&
+              dragState.current?.groupIndex === groupIndex &&
+              dragState.current?.overItemIndex === itemIndex &&
+              dragState.current?.fromItemIndex !== itemIndex;
+
+            const content = (
+              <>
+                <GripIcon />
+                <span className="flex-shrink-0">{icon}</span>
+                <span>{label}</span>
+                {active && !external && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-accent flex-shrink-0" />}
+              </>
+            );
+
+            const baseClass = `group flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
+              isItemDragOver ? "ring-1 ring-accent/50 bg-white/5" : ""
+            }`;
+
             if (external) {
               return (
-                <Link key={href} href={href}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors bg-accent/10 text-accent hover:bg-accent/20"
+                <div
+                  key={href}
+                  draggable
+                  onDragStart={e => onItemDragStart(e, groupIndex, itemIndex)}
+                  onDragOver={e => onItemDragOver(e, groupIndex, itemIndex)}
+                  onDrop={e => onItemDrop(e, groupIndex, itemIndex)}
+                  onDragEnd={onItemDragEnd}
+                  className={baseClass}
                 >
-                  <span className="flex-shrink-0">{icon}</span>
-                  <span>{label}</span>
-                </Link>
+                  <Link href={href} className="flex items-center gap-2 flex-1 bg-accent/10 text-accent hover:bg-accent/20 rounded-lg px-1 py-0.5">
+                    {content}
+                  </Link>
+                </div>
               );
             }
             return (
-              <Link key={href} href={href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-                  active ? "bg-accent/20 text-accent" : "text-white/50 hover:text-white hover:bg-white/10"
-                }`}
+              <div
+                key={href}
+                draggable
+                onDragStart={e => onItemDragStart(e, groupIndex, itemIndex)}
+                onDragOver={e => onItemDragOver(e, groupIndex, itemIndex)}
+                onDrop={e => onItemDrop(e, groupIndex, itemIndex)}
+                onDragEnd={onItemDragEnd}
+                className={`${baseClass} ${active ? "bg-accent/20 text-accent" : "text-white/50 hover:text-white hover:bg-white/10"}`}
               >
-                <span className="flex-shrink-0">{icon}</span>
-                <span>{label}</span>
-                {active && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-accent flex-shrink-0" />}
-              </Link>
+                <Link href={href} className="flex items-center gap-2 flex-1">
+                  {content}
+                </Link>
+              </div>
             );
           })}
         </div>
@@ -275,8 +351,10 @@ function NavGroup({ group, pathname, openSidebar }) {
 export default function AdminShell({ children }) {
   const [open, setOpen]       = useState(true);
   const [session, setSession] = useState(null);
+  const [groups, setGroups]   = useState(() => applyOrder(DEFAULT_NAV_GROUPS, loadSavedOrder()));
   const pathname = usePathname();
   const router   = useRouter();
+  const dragState = useRef(null);
 
   useEffect(() => {
     const s = getSession();
@@ -292,6 +370,70 @@ export default function AdminShell({ children }) {
     logout();
     sessionStorage.removeItem("admin_verified");
     router.replace("/admin/login");
+  }
+
+  // --- Group drag handlers ---
+  function onGroupDragStart(e, fromIndex) {
+    dragState.current = { type: "group", fromIndex, overIndex: fromIndex };
+    e.dataTransfer.effectAllowed = "move";
+  }
+  function onGroupDragOver(e, overIndex) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragState.current?.type === "group") {
+      dragState.current.overIndex = overIndex;
+    }
+  }
+  function onGroupDrop(e, toIndex) {
+    e.preventDefault();
+    if (dragState.current?.type !== "group") return;
+    const { fromIndex } = dragState.current;
+    if (fromIndex === toIndex) return;
+    setGroups(prev => {
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      persistOrder(next);
+      return next;
+    });
+    dragState.current = null;
+  }
+  function onGroupDragEnd() {
+    dragState.current = null;
+  }
+
+  // --- Item drag handlers ---
+  function onItemDragStart(e, groupIndex, fromItemIndex) {
+    dragState.current = { type: "item", groupIndex, fromItemIndex, overItemIndex: fromItemIndex };
+    e.dataTransfer.effectAllowed = "move";
+    e.stopPropagation();
+  }
+  function onItemDragOver(e, groupIndex, overItemIndex) {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = "move";
+    if (dragState.current?.type === "item" && dragState.current.groupIndex === groupIndex) {
+      dragState.current.overItemIndex = overItemIndex;
+    }
+  }
+  function onItemDrop(e, groupIndex, toItemIndex) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (dragState.current?.type !== "item") return;
+    const { fromItemIndex, groupIndex: fromGroup } = dragState.current;
+    if (fromGroup !== groupIndex || fromItemIndex === toItemIndex) return;
+    setGroups(prev => {
+      const next = prev.map(g => ({ ...g, items: [...g.items] }));
+      const items = next[groupIndex].items;
+      const [moved] = items.splice(fromItemIndex, 1);
+      items.splice(toItemIndex, 0, moved);
+      persistOrder(next);
+      return next;
+    });
+    dragState.current = null;
+  }
+  function onItemDragEnd() {
+    dragState.current = null;
   }
 
   if (!session) return null;
@@ -311,8 +453,23 @@ export default function AdminShell({ children }) {
         </div>
 
         <nav className="flex-1 px-2 py-3 space-y-1 overflow-y-auto overflow-x-hidden">
-          {NAV_GROUPS.map(group => (
-            <NavGroup key={group.label} group={group} pathname={pathname} openSidebar={open} />
+          {groups.map((group, groupIndex) => (
+            <NavGroup
+              key={group.label}
+              group={group}
+              groupIndex={groupIndex}
+              pathname={pathname}
+              openSidebar={open}
+              onGroupDragStart={onGroupDragStart}
+              onGroupDragOver={onGroupDragOver}
+              onGroupDrop={onGroupDrop}
+              onGroupDragEnd={onGroupDragEnd}
+              onItemDragStart={onItemDragStart}
+              onItemDragOver={onItemDragOver}
+              onItemDrop={onItemDrop}
+              onItemDragEnd={onItemDragEnd}
+              dragState={dragState}
+            />
           ))}
         </nav>
 

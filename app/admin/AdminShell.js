@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { getSession, logout } from "@/lib/auth";
+import { useBranding, brandStyle } from "@/lib/workforce/use-branding";
 
 const DEFAULT_NAV_GROUPS = [
   {
@@ -214,6 +215,16 @@ const DEFAULT_NAV_GROUPS = [
           </svg>
         ),
       },
+      {
+        label: "Branding",
+        href: "/admin/branding",
+        icon: (
+          <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="13" cy="3" r="2"/><circle cx="3" cy="13" r="2"/>
+            <path d="M3 11C3 7 7 3 11 3"/><path d="M13 5c0 4-4 8-8 8"/>
+          </svg>
+        ),
+      },
     ],
   },
 ];
@@ -355,6 +366,7 @@ export default function AdminShell({ children }) {
   const pathname = usePathname();
   const router   = useRouter();
   const dragState = useRef(null);
+  const branding  = useBranding();
 
   useEffect(() => {
     const s = getSession();
@@ -439,15 +451,20 @@ export default function AdminShell({ children }) {
   if (!session) return null;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50">
+    <div className="flex h-screen overflow-hidden bg-gray-50" style={brandStyle(branding)}>
       {/* Sidebar */}
       <aside className={`bg-primary flex flex-col flex-shrink-0 transition-all duration-300 ease-in-out overflow-hidden ${open ? "w-56" : "w-0"}`}>
         <div className="px-4 py-[18px] flex items-center gap-2.5 border-b border-white/10 flex-shrink-0">
-          <div className="w-7 h-7 rounded-md bg-accent flex items-center justify-center flex-shrink-0">
-            <span className="text-primary text-xs font-black tracking-tighter">UE</span>
+          <div className="w-7 h-7 rounded-md bg-accent flex items-center justify-center flex-shrink-0 overflow-hidden flex-shrink-0">
+            {branding.logo_url
+              ? <img src={branding.logo_url} alt="logo" className="w-full h-full object-cover" />
+              : <span className="text-primary text-xs font-black tracking-tighter">
+                  {(branding.company_name || "UE").slice(0, 2).toUpperCase()}
+                </span>
+            }
           </div>
           <div className="min-w-0">
-            <span className="text-white font-semibold text-sm whitespace-nowrap">Unified Employee</span>
+            <span className="text-white font-semibold text-sm whitespace-nowrap">{branding.company_name || "Unified Employee"}</span>
             <p className="text-accent text-[10px] font-semibold uppercase tracking-widest whitespace-nowrap">Admin</p>
           </div>
         </div>

@@ -2,6 +2,7 @@
 import { useState, useCallback, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { setSession, setTenantId } from "@/lib/auth";
+import { brandStyle } from "@/lib/workforce/use-branding";
 
 function extractYouTubeId(url) {
   const match = url?.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\s]+)/);
@@ -127,6 +128,8 @@ function PinPage() {
   const [result, setResult]             = useState(null);
   const [questions, setQuestions]       = useState([]);
   const [companyName, setCompanyName]   = useState("Unified Employee");
+  const [logoUrl, setLogoUrl]           = useState(null);
+  const [branding, setBrandingState]    = useState({ primary: "#023f62", accent: "#00ce7c" });
   const [tenantReady, setTenantReady]   = useState(false);
   const [cfg,       setCfg]             = useState({ geofence_lat: 33.7488, geofence_lng: -84.3234, geofence_radius_ft: 1000, pin_length: 4, kiosk_reset_seconds: 3 });
 
@@ -149,6 +152,12 @@ function PinPage() {
     if (!tenantReady) return;
     fetch("/api/checklist").then(r => r.json()).then(setQuestions);
     fetch("/api/settings").then(r => r.json()).then(s => setCfg(prev => ({ ...prev, ...s })));
+    fetch("/api/admin/branding").then(r => r.ok ? r.json() : null).then(b => {
+      if (!b) return;
+      if (b.company_name) setCompanyName(b.company_name);
+      if (b.logo_url) setLogoUrl(b.logo_url);
+      setBrandingState({ primary: b.primary_color || "#023f62", accent: b.accent_color || "#00ce7c" });
+    }).catch(() => {});
   }, [tenantReady]);
   const reset = () => resetKiosk(setDigits, setStage, setUser, setDirection, setActiveRecordId, setChecklist, setResult);
 
@@ -235,7 +244,7 @@ function PinPage() {
   const KEYS = [1, 2, 3, 4, 5, 6, 7, 8, 9, null, 0, "⌫"];
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-primary px-4">
+    <div className="min-h-screen flex items-center justify-center bg-primary px-4" style={brandStyle(branding)}>
 
       {stage === "checklist" && checklist && (
         <ChecklistModal
@@ -250,8 +259,13 @@ function PinPage() {
 
         {/* Logo */}
         <div className="flex flex-col items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-accent flex items-center justify-center shadow-lg">
-            <span className="text-primary text-lg font-black tracking-tighter">UE</span>
+          <div className="w-12 h-12 rounded-2xl bg-accent flex items-center justify-center shadow-lg overflow-hidden">
+            {logoUrl
+              ? <img src={logoUrl} alt="logo" className="w-full h-full object-cover" />
+              : <span className="text-primary text-lg font-black tracking-tighter">
+                  {(companyName || "UE").slice(0, 2).toUpperCase()}
+                </span>
+            }
           </div>
           <div className="text-center">
             <h1 className="text-white text-xl font-bold">{companyName}</h1>

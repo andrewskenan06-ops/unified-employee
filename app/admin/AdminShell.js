@@ -7,7 +7,7 @@ import { useBranding, brandStyle } from "@/lib/workforce/use-branding";
 
 const DEFAULT_NAV_GROUPS = [
   {
-    label: "Workforce Module",
+    label: "Admin Module",
     items: [
       {
         label: "WF Overview",

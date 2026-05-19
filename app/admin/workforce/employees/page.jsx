@@ -125,7 +125,7 @@ export default function WorkforceEmployeesPage() {
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-primary">
-                        {emp.name ?? `${emp.first_name ?? ""} ${emp.last_name ?? ""}`.trim() || "—"}
+                        {emp.name || (`${emp.first_name ?? ""} ${emp.last_name ?? ""}`.trim()) || "—"}
                       </p>
                       {emp.employee_number && <p className="text-[10px] text-gray-400">#{emp.employee_number}</p>}
                     </div>

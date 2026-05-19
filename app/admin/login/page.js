@@ -3,14 +3,32 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { setSession, setTenantId } from "@/lib/auth";
 
+const DEFAULT_SLUG = process.env.NEXT_PUBLIC_DEFAULT_TENANT_SLUG;
+
 export default function AdminLoginPage() {
   const router = useRouter();
-  const [step, setStep]     = useState("slug"); // slug | pin
+  const [step, setStep]     = useState(DEFAULT_SLUG ? "loading" : "slug");
   const [slug, setSlug]     = useState("");
   const [tenant, setTenant] = useState(null);
   const [slugError, setSlugError] = useState("");
   const [digits, setDigits] = useState([]);
   const [shake, setShake]   = useState(false);
+
+  useEffect(() => {
+    if (!DEFAULT_SLUG) return;
+    fetch(`/api/tenants/${DEFAULT_SLUG.trim().toLowerCase()}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.id) {
+          setTenantId(data.id);
+          setTenant(data);
+          setStep("pin");
+        } else {
+          setStep("slug");
+        }
+      })
+      .catch(() => setStep("slug"));
+  }, []);
 
   const triggerShake = () => {
     setShake(true);
@@ -65,6 +83,12 @@ export default function AdminLoginPage() {
   }, [step, shake, digits]);
 
   const KEYS = [1, 2, 3, 4, 5, 6, 7, 8, 9, null, 0, "⌫"];
+
+  if (step === "loading") return (
+    <div className="min-h-screen flex items-center justify-center bg-primary">
+      <div className="w-8 h-8 rounded-full border-2 border-accent border-t-transparent animate-spin" />
+    </div>
+  );
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-primary px-4">

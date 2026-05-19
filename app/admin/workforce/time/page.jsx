@@ -81,7 +81,7 @@ export default function WorkforceTimePage() {
         {tab === "pending" && (
           <table className="w-full">
             <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
+              <tr className="bg-gray-100 border-b-2 border-gray-300">
                 <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Entry Date</th>
                 <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Employee</th>
                 <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Clock In</th>
@@ -90,11 +90,11 @@ export default function WorkforceTimePage() {
                 <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-gray-200">
               {pending.length === 0 ? (
                 <tr><td colSpan={6} className="px-5 py-10 text-center text-gray-400 text-sm">No pending approvals.</td></tr>
               ) : pending.map(entry => (
-                <tr key={entry.id} className="hover:bg-gray-50">
+                <tr key={entry.id} className="hover:bg-blue-50/40">
                   <td className="px-5 py-3.5 text-sm text-gray-600">{fmtDate(entry.entry_date ?? entry.clock_in)}</td>
                   <td className="px-5 py-3.5 text-sm font-semibold text-primary">{entry.employee_name ?? entry.name ?? "—"}</td>
                   <td className="px-5 py-3.5 text-sm text-gray-600">{fmt(entry.clock_in)}</td>
@@ -114,7 +114,7 @@ export default function WorkforceTimePage() {
         {tab === "disputed" && (
           <table className="w-full">
             <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
+              <tr className="bg-gray-100 border-b-2 border-gray-300">
                 <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Date</th>
                 <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Employee</th>
                 <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Reason</th>
@@ -122,11 +122,11 @@ export default function WorkforceTimePage() {
                 <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-gray-200">
               {disputed.length === 0 ? (
                 <tr><td colSpan={5} className="px-5 py-10 text-center text-gray-400 text-sm">No disputed entries.</td></tr>
               ) : disputed.map(entry => (
-                <tr key={entry.id} className="hover:bg-gray-50">
+                <tr key={entry.id} className="hover:bg-blue-50/40">
                   <td className="px-5 py-3.5 text-sm text-gray-600">{fmtDate(entry.entry_date ?? entry.date)}</td>
                   <td className="px-5 py-3.5 text-sm font-semibold text-primary">{entry.employee_name ?? entry.name ?? "—"}</td>
                   <td className="px-5 py-3.5 text-sm text-gray-500 max-w-xs truncate">{entry.dispute_reason ?? entry.reason ?? "—"}</td>

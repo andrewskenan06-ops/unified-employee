@@ -117,7 +117,7 @@ export default function WorkforceBriefingsPage() {
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
         <table className="w-full">
           <thead>
-            <tr className="bg-gray-50 border-b border-gray-200">
+            <tr className="bg-gray-100 border-b-2 border-gray-300">
               <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Title</th>
               <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Category</th>
               <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Content Type</th>
@@ -127,11 +127,11 @@ export default function WorkforceBriefingsPage() {
               <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-gray-200">
             {briefings.length === 0 ? (
               <tr><td colSpan={7} className="px-5 py-10 text-center text-gray-400 text-sm">No briefings found.</td></tr>
             ) : briefings.map(b => (
-              <tr key={b.id} className="hover:bg-gray-50">
+              <tr key={b.id} className="hover:bg-blue-50/40">
                 <td className="px-5 py-3.5">
                   <p className="text-sm font-semibold text-primary">{b.title}</p>
                 </td>

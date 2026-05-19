@@ -83,7 +83,7 @@ export default function WorkforceCasesPage() {
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
         <table className="w-full">
           <thead>
-            <tr className="bg-gray-50 border-b border-gray-200">
+            <tr className="bg-gray-100 border-b-2 border-gray-300">
               <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Employee</th>
               <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Type</th>
               <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Category</th>
@@ -93,14 +93,14 @@ export default function WorkforceCasesPage() {
               <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Created</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-gray-200">
             {filtered.length === 0 ? (
               <tr><td colSpan={7} className="px-5 py-10 text-center text-gray-400 text-sm">No cases found.</td></tr>
             ) : filtered.map(c => (
               <>
                 <tr
                   key={c.id}
-                  className="hover:bg-gray-50 cursor-pointer"
+                  className="hover:bg-blue-50/40 cursor-pointer"
                   onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}>
                   <td className="px-5 py-3.5 text-sm font-semibold text-primary">{c.employee_name ?? c.name ?? "—"}</td>
                   <td className="px-5 py-3.5"><TypeBadge type={c.case_type ?? c.type} /></td>

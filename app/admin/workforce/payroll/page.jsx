@@ -106,7 +106,7 @@ export default function WorkforcePayrollPage() {
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
         <table className="w-full">
           <thead>
-            <tr className="bg-gray-50 border-b border-gray-200">
+            <tr className="bg-gray-100 border-b-2 border-gray-300">
               <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Period</th>
               <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Pay Date</th>
               <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Status</th>
@@ -114,12 +114,12 @@ export default function WorkforcePayrollPage() {
               <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-gray-200">
             {runs.length === 0 ? (
               <tr><td colSpan={5} className="px-5 py-10 text-center text-gray-400 text-sm">No payroll runs found.</td></tr>
             ) : runs.map(run => (
               <>
-                <tr key={run.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setExpandedId(expandedId === run.id ? null : run.id)}>
+                <tr key={run.id} className="hover:bg-blue-50/40 cursor-pointer" onClick={() => setExpandedId(expandedId === run.id ? null : run.id)}>
                   <td className="px-5 py-3.5">
                     <p className="text-sm font-semibold text-primary">
                       {fmtDate(run.period_start)} – {fmtDate(run.period_end)}
@@ -150,7 +150,7 @@ export default function WorkforcePayrollPage() {
                         ) : (
                           <table className="w-full">
                             <thead>
-                              <tr className="bg-gray-50 border-b border-gray-200">
+                              <tr className="bg-gray-100 border-b-2 border-gray-300">
                                 <th className="px-4 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Employee</th>
                                 <th className="px-4 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Regular Hrs</th>
                                 <th className="px-4 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">OT Hrs</th>
@@ -158,7 +158,7 @@ export default function WorkforcePayrollPage() {
                                 <th className="px-4 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Net Pay</th>
                               </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100">
+                            <tbody className="divide-y divide-gray-200">
                               {(run.entries ?? []).map((entry, i) => (
                                 <tr key={entry.id ?? i}>
                                   <td className="px-4 py-2.5 text-sm font-semibold text-primary">{entry.employee_name ?? "—"}</td>

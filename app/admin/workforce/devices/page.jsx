@@ -118,7 +118,7 @@ export default function WorkforceDevicesPage() {
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
         <table className="w-full">
           <thead>
-            <tr className="bg-gray-50 border-b border-gray-200">
+            <tr className="bg-gray-100 border-b-2 border-gray-300">
               <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Label</th>
               <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Location</th>
               <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Role</th>
@@ -128,13 +128,13 @@ export default function WorkforceDevicesPage() {
               <th className="px-5 py-3.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-gray-200">
             {devices.length === 0 ? (
               <tr><td colSpan={7} className="px-5 py-10 text-center text-gray-400 text-sm">No devices registered.</td></tr>
             ) : devices.map(device => {
               const isActive = device.is_active ?? device.active ?? false;
               return (
-                <tr key={device.id} className="hover:bg-gray-50">
+                <tr key={device.id} className="hover:bg-blue-50/40">
                   <td className="px-5 py-3.5 text-sm font-semibold text-primary">{device.label ?? "—"}</td>
                   <td className="px-5 py-3.5 text-sm text-gray-500">{device.location ?? "—"}</td>
                   <td className="px-5 py-3.5 text-sm text-gray-500 capitalize">{(device.role ?? "—").replace(/_/g, " ")}</td>

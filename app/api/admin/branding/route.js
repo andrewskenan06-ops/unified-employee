@@ -1,8 +1,16 @@
 import sql from "@/lib/db";
 import { requireTenantContext } from "@/lib/tenant";
 
+// Ensure branding columns exist (runs once on first use, safe to repeat)
+async function ensureColumns() {
+  await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS primary_color TEXT`;
+  await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS accent_color  TEXT`;
+  await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS logo_url      TEXT`;
+}
+
 export async function GET() {
   try {
+    await ensureColumns();
     const { tenant } = await requireTenantContext();
     const rows = await sql`
       SELECT name, logo_url, primary_color, accent_color
@@ -22,6 +30,7 @@ export async function GET() {
 
 export async function PATCH(request) {
   try {
+    await ensureColumns();
     const { tenant } = await requireTenantContext();
     const { company_name, logo_url, primary_color, accent_color } = await request.json();
 

@@ -166,6 +166,7 @@ export default function BrandingPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving]   = useState(false);
   const [saved, setSaved]     = useState(false);
+  const [saveError, setSaveError] = useState(null);
 
   useEffect(() => {
     fetch("/api/admin/branding")
@@ -185,19 +186,29 @@ export default function BrandingPage() {
   async function handleSave() {
     setSaving(true);
     setSaved(false);
-    await fetch("/api/admin/branding", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        company_name:  form.company_name  || null,
-        logo_url:      form.logo_url      || null,
-        primary_color: form.primary_color || null,
-        accent_color:  form.accent_color  || null,
-      }),
-    });
+    setSaveError(null);
+    try {
+      const res = await fetch("/api/admin/branding", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          company_name:  form.company_name  || null,
+          logo_url:      form.logo_url      || null,
+          primary_color: form.primary_color || null,
+          accent_color:  form.accent_color  || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setSaveError(data.error || "Save failed");
+      } else {
+        setSaved(true);
+        setTimeout(() => setSaved(false), 3000);
+      }
+    } catch (e) {
+      setSaveError(e.message);
+    }
     setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
   }
 
   function set(key, val) { setForm(f => ({ ...f, [key]: val })); setSaved(false); }
@@ -278,7 +289,8 @@ export default function BrandingPage() {
             >
               {saving ? "Saving…" : "Save Changes"}
             </button>
-            {saved && <span className="text-sm text-green-600 font-medium">Saved! Reload to see changes.</span>}
+            {saved && <span className="text-sm text-green-600 font-medium">Saved! Colors update on next page load.</span>}
+            {saveError && <span className="text-sm text-red-500 font-medium">Error: {saveError}</span>}
           </div>
         </div>
 

@@ -1,5 +1,6 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { HexColorPicker } from "react-colorful";
 
 const PRIMARY_PRESETS = [
   { label: "Navy",    value: "#023f62" },
@@ -26,6 +27,75 @@ const ACCENT_PRESETS = [
 function hexToRgb(hex) {
   const h = hex.replace("#", "");
   return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)];
+}
+
+function ColorField({ label, sublabel, value, onChange, presets }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDown(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false); }
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+
+  return (
+    <section className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="font-semibold text-gray-800 text-sm">{label}</h2>
+        {sublabel && <span className="text-xs text-gray-400">{sublabel}</span>}
+      </div>
+
+      {/* Swatch + hex input + wheel toggle */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={() => setOpen(o => !o)}
+          className="w-10 h-10 rounded-lg border-2 border-gray-200 flex-shrink-0 shadow-sm hover:scale-105 transition-transform"
+          style={{ backgroundColor: value }}
+          title="Open color wheel"
+        />
+        <input
+          type="text"
+          value={value}
+          onChange={e => /^#[0-9a-fA-F]{0,6}$/.test(e.target.value) && onChange(e.target.value)}
+          className="w-28 border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-accent/40"
+        />
+        <button
+          onClick={() => setOpen(o => !o)}
+          className="text-xs text-gray-400 hover:text-gray-700 underline underline-offset-2"
+        >
+          {open ? "Close" : "Color wheel"}
+        </button>
+      </div>
+
+      {/* Color wheel (react-colorful) */}
+      {open && (
+        <div ref={ref} className="relative">
+          <style>{`
+            .react-colorful { width: 100% !important; height: 200px !important; border-radius: 10px; overflow: hidden; }
+            .react-colorful__saturation { border-radius: 10px 10px 0 0; }
+            .react-colorful__hue { height: 20px; border-radius: 0 0 10px 10px; margin-top: 4px; }
+            .react-colorful__pointer { width: 20px; height: 20px; border-width: 3px; }
+          `}</style>
+          <HexColorPicker color={value} onChange={onChange} />
+        </div>
+      )}
+
+      {/* Presets */}
+      <div className="flex flex-wrap gap-2">
+        {presets.map(p => (
+          <button
+            key={p.value}
+            onClick={() => onChange(p.value)}
+            title={p.label}
+            className={`w-7 h-7 rounded-lg border-2 transition-all ${value === p.value ? "border-gray-800 scale-110" : "border-transparent hover:scale-105"}`}
+            style={{ backgroundColor: p.value }}
+          />
+        ))}
+      </div>
+    </section>
+  );
 }
 
 function PreviewSidebar({ companyName, logoUrl, primary, accent }) {
@@ -182,71 +252,21 @@ export default function BrandingPage() {
             </div>
           </section>
 
-          {/* Primary color */}
-          <section className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="font-semibold text-gray-800 text-sm">Primary Color</h2>
-              <span className="text-xs text-gray-400">Sidebar, backgrounds</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <input
-                type="color"
-                value={form.primary_color}
-                onChange={e => set("primary_color", e.target.value)}
-                className="w-10 h-10 rounded-lg cursor-pointer border border-gray-200 p-0.5"
-              />
-              <input
-                type="text"
-                value={form.primary_color}
-                onChange={e => /^#[0-9a-fA-F]{0,6}$/.test(e.target.value) && set("primary_color", e.target.value)}
-                className="w-28 border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-accent/40"
-              />
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {PRIMARY_PRESETS.map(p => (
-                <button
-                  key={p.value}
-                  onClick={() => set("primary_color", p.value)}
-                  title={p.label}
-                  className={`w-7 h-7 rounded-lg border-2 transition-all ${form.primary_color === p.value ? "border-gray-800 scale-110" : "border-transparent hover:scale-105"}`}
-                  style={{ backgroundColor: p.value }}
-                />
-              ))}
-            </div>
-          </section>
+          <ColorField
+            label="Primary Color"
+            sublabel="Sidebar, backgrounds"
+            value={form.primary_color}
+            onChange={v => set("primary_color", v)}
+            presets={PRIMARY_PRESETS}
+          />
 
-          {/* Accent color */}
-          <section className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="font-semibold text-gray-800 text-sm">Accent Color</h2>
-              <span className="text-xs text-gray-400">Buttons, highlights, active states</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <input
-                type="color"
-                value={form.accent_color}
-                onChange={e => set("accent_color", e.target.value)}
-                className="w-10 h-10 rounded-lg cursor-pointer border border-gray-200 p-0.5"
-              />
-              <input
-                type="text"
-                value={form.accent_color}
-                onChange={e => /^#[0-9a-fA-F]{0,6}$/.test(e.target.value) && set("accent_color", e.target.value)}
-                className="w-28 border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-accent/40"
-              />
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {ACCENT_PRESETS.map(p => (
-                <button
-                  key={p.value}
-                  onClick={() => set("accent_color", p.value)}
-                  title={p.label}
-                  className={`w-7 h-7 rounded-lg border-2 transition-all ${form.accent_color === p.value ? "border-gray-800 scale-110" : "border-transparent hover:scale-105"}`}
-                  style={{ backgroundColor: p.value }}
-                />
-              ))}
-            </div>
-          </section>
+          <ColorField
+            label="Accent Color"
+            sublabel="Buttons, highlights, active states"
+            value={form.accent_color}
+            onChange={v => set("accent_color", v)}
+            presets={ACCENT_PRESETS}
+          />
 
           {/* Save */}
           <div className="flex items-center gap-3">
